@@ -13,17 +13,17 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Scaffold do projeto rodando localmente, conectado ao Supabase compartilhado, com schema `reconfirmacao` criado (vazio) e identidade visual SNOW aplicada — base para todos os milestones seguintes.
 
 **Entregas:**
-- [ ] `npx create-next-app` (App Router, TypeScript, Tailwind) na raiz do projeto
-- [ ] Estrutura de pastas conforme `CLAUDE.md` (`src/app`, `src/features`, `src/lib`, `src/components/ui`, `supabase/migrations`)
-- [ ] shadcn/ui instalado e configurado
-- [ ] Tema SNOW aplicado via skill `snow-theme` (tokens de cor em `globals.css`/`tailwind.config`, raio, sombra, fonte)
-- [ ] Clients Supabase (`src/lib/supabase/`): client de browser (anon key) e client de servidor (service role), lendo credenciais do `.env` da raiz — nunca hardcoded
-- [ ] `.env.example` criado (mesmas chaves do `.env`, valores vazios/fake) e `.env` confirmado no `.gitignore`
-- [ ] Migration inicial: `CREATE SCHEMA reconfirmacao` (schema vazio, sem tabelas ainda — ver Milestone 2 para o schema de dados)
-- [ ] Verificação via Supabase API/CLI de que nenhum nome de tabela planejado (`hotels`, `reservations`, `email_sends`, `hotel_replies`, `audit_status`) colide com o schema `public` atual do TripQuote
-- [ ] Git inicializado neste diretório (`reconfirmacao/`), primeiro commit com `.gitignore` correto (nunca commitar `.env`, `node_modules`, `.next`)
-- [ ] README mínimo: como rodar localmente (`npm install`, `npm run dev`), onde estão as credenciais (`.env` na raiz)
-- [ ] Layout raiz da aplicação renderiza (`/`) com header/nav básico já na identidade SNOW, confirmando que o tema está de fato aplicado
+- [x] `npx create-next-app` (App Router, TypeScript, Tailwind) na raiz do projeto
+- [x] Estrutura de pastas conforme `CLAUDE.md` (`src/app`, `src/features`, `src/lib`, `src/components/ui`, `supabase/migrations`)
+- [x] shadcn/ui instalado e configurado
+- [x] Tema SNOW aplicado via skill `snow-theme` (tokens de cor em `globals.css`/`tailwind.config`, raio, sombra, fonte)
+- [x] Clients Supabase (`src/lib/supabase/`): client de browser (anon key) e client de servidor (service role), lendo credenciais do `.env` da raiz — nunca hardcoded
+- [x] `.env.example` criado (mesmas chaves do `.env`, valores vazios/fake) e `.env` confirmado no `.gitignore`
+- [x] Migration inicial: `CREATE SCHEMA reconfirmacao` (schema vazio, sem tabelas ainda — ver Milestone 2 para o schema de dados)
+- [x] Verificação via Supabase API/CLI de que nenhum nome de tabela planejado (`hotels`, `reservations`, `email_sends`, `hotel_replies`, `audit_status`) colide com o schema `public` atual do TripQuote
+- [x] Git inicializado neste diretório (`reconfirmacao/`), primeiro commit com `.gitignore` correto (nunca commitar `.env`, `node_modules`, `.next`)
+- [x] README mínimo: como rodar localmente (`npm install`, `npm run dev`), onde estão as credenciais (`.env` na raiz)
+- [x] Layout raiz da aplicação renderiza (`/`) com header/nav básico já na identidade SNOW, confirmando que o tema está de fato aplicado
 
 **Commit final:** `chore: scaffold do projeto Next.js + Supabase + tema SNOW`
 
