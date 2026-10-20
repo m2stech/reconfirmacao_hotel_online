@@ -1,0 +1,34 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Legacy reference app (own repo, kept locally for reference only)
+reconfirmacao_Hoteis/
+
+# Sample/legacy spreadsheet data (never commit real reservation data)
+roomingList.xlsx
+*.xlsx
+!**/tests/fixtures/**/*.xlsx
+
+# Supabase local
+supabase/.temp/
+
+# Claude Code local settings (machine-specific, not shared)
+.claude/settings.local.json
+
+# Misc
+.DS_Store
+*.log
+npm-debug.log*
+.vercel
+*.tsbuildinfo
