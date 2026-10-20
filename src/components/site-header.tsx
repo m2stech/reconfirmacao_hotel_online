@@ -28,9 +28,14 @@ export async function SiteHeader() {
                 Hotéis
               </Link>
               {profile?.role === "admin" ? (
-                <Link href="/admin/usuarios" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
-                  Admin
-                </Link>
+                <>
+                  <Link href="/admin/usuarios" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                    Usuários
+                  </Link>
+                  <Link href="/admin/custos" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                    Custos de IA
+                  </Link>
+                </>
               ) : null}
             </nav>
             <UserMenu name={profile?.full_name ?? user.email ?? ""} />

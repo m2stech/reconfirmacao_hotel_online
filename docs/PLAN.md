@@ -159,10 +159,21 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Telas exclusivas de admin — gestão de usuários e visão de custo de IA — fechando a cobertura de UI antes de qualquer integração externa real entrar em cena.
 
 **Entregas:**
-- [ ] Tela `/admin/usuarios` (somente `role = admin`): listar usuários de `profiles`, convidar novo usuário, desativar/reativar, alterar papel
-- [ ] Tela `/admin/custos`: visão agregada de custo de IA (tokens/USD) por período — inicialmente vazia/zerada, populada de verdade a partir do Milestone 9
-- [ ] Guard de rota: página retorna 403/redirect para não-admin
-- [ ] Toda ação administrativa (desativar usuário, mudar papel) grava em `audit_log`
+- [x] Tela `/admin/usuarios` (somente `role = admin`): listar usuários de `profiles`, convidar novo usuário, desativar/reativar, alterar papel
+- [x] Tela `/admin/custos`: visão agregada de custo de IA (tokens/USD) por período — inicialmente vazia/zerada, populada de verdade a partir do Milestone 9
+- [x] Guard de rota: página retorna 403/redirect para não-admin
+- [x] Toda ação administrativa (desativar usuário, mudar papel) grava em `audit_log`
+
+**Decisões tomadas nesta sessão:**
+- Convite de usuário usa `supabase.auth.admin.inviteUserByEmail()` (magic link do próprio Supabase Auth) em vez de criar usuário com senha temporária — mesmo ponto pendente do template de e-mail já registrado no Milestone 1 (menciona "SnowQuote"), não resolvido aqui.
+- Guard de admin em duas camadas: middleware (`src/lib/supabase/middleware.ts`) redireciona `/admin/*` para `/dashboard` quando `profile.role !== "admin"` (cobre as páginas); `requireAdmin()` (`src/features/admin/require-admin.ts`) retorna 403 nos Route Handlers `/api/admin/*` (cobre chamadas diretas de API, inclusive de quem contorna a UI).
+- Leitura/escrita de `profiles` nas rotas de admin (`src/features/admin/queries.ts`) usa `createServiceRoleClient()`, não o client de sessão — RLS de `profiles` (schema do TripQuote) não foi desenhada para permitir um usuário alterar o papel/status de outro; mesma necessidade do `audit_log` insert, já resolvida nos Milestones 3/4.
+- Admin não pode alterar o próprio registro por `/api/admin/usuarios/[id]` (bloqueado com 400) — evita autodesativação ou auto-rebaixamento de papel acidental sem outro admin para reverter.
+- `agregarCustoIAporMes()` (`src/features/admin/cost-queries.ts`) já lê `reconfirmacao.hotel_replies` agrupando por mês (`openai_tokens_input/output`, `openai_custo_usd`), mas a tabela só recebe linhas reais a partir do Milestone 9 — a tela funciona e builda normalmente, só aparece vazia até lá (comportamento esperado, testado).
+
+**Gap de prerendering corrigido nesta sessão (mesma classe de bug do Milestone 4):** `getCurrentUserWithProfile()` usa `cookies()`, que bloqueia o prerendering de uma rota se chamado direto no corpo da `page.tsx` (Cache Components do Next 16). Corrigido extraindo o guard (fetch de user/profile + `redirect()`) para um Server Component assíncrono próprio em cada página (`UsersTableGuarded`/`CostsTableGuarded`), envolto em `<Suspense>` — mesmo padrão já usado para `MetricCards`/`AuditTable`.
+
+**Teste manual (sessão real via API, sem Playwright — navegador não disponível neste ambiente):** login via Supabase Auth API como `admin@tripquote.dev` e `consultor@tripquote.dev` (senha já existente, nenhuma credencial trocada), cookies de sessão montados no formato que `@supabase/ssr` espera (`sb-<project-ref>-auth-token`, JSON do objeto `Session` completo, base64url com prefixo `base64-`). Confirmado: (1) consultor acessando `/admin/usuarios` é redirecionado para `/dashboard`; (2) consultor chamando `GET /api/admin/usuarios` recebe 403; (3) admin lista os 7 usuários cadastrados; (4) `GET /api/admin/custos` retorna `{ok: true, custos: []}` sem erro; (5) admin desativa e reativa `produtos2@bvgroup.com.br`, ambas as chamadas gravam em `audit_log` com `actor_id` correto; (6) admin tentando alterar o próprio usuário recebe 400. Nenhum dado de produção alterado além do toggle ativo/inativo revertido ao estado original ao final do teste.
 
 **Commit final:** `feat: painel administrativo (usuários e custos de IA)`
 
