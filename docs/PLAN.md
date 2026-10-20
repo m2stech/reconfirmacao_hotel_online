@@ -87,15 +87,17 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Primeira tela funcional de ponta a ponta na UI — consultor sobe um `.xlsx`, vê o preview parseado e a validação de colunas, ainda **sem enviar e-mail de verdade** (grava reserva no banco, mas o envio real fica para o Milestone 7).
 
 **Entregas:**
-- [ ] Tela `/reservas/importar` com upload de `.xlsx` (drag & drop + seletor de arquivo), estilo SNOW
-- [ ] Parsing do xlsx no backend (Route Handler): cabeçalho sempre na linha 5, conforme formato real do RoomingList (ver `reconfirmacao_Hoteis/roomingList.xlsx` de referência)
-- [ ] Validação de colunas obrigatórias com mensagem de erro clara se faltar alguma
-- [ ] Consolidação por `Localizador`: linhas do mesmo localizador viram 1 registro de reserva com todos os hóspedes agrupados (PRD §4.1, item 2 — decisão fechada, não é 1 linha = 1 reserva)
-- [ ] Tela de preview: tabela mostrando as reservas que serão importadas, com indicação visual de quais localizadores já existem no banco (deduplicação, ver Milestone 5) vs. quais são novos
-- [ ] Botão "Confirmar importação" grava em `reconfirmacao.reservations` (ainda sem acionar envio de e-mail)
-- [ ] Teste manual com o `roomingList.xlsx` de referência (dado sintético/anonimizado, nunca o arquivo real de produção — PRD §7)
+- [x] Tela `/reservas/importar` com upload de `.xlsx` (drag & drop + seletor de arquivo), estilo SNOW
+- [x] Parsing do xlsx no backend (Route Handler): cabeçalho sempre na linha 5, conforme formato real do RoomingList (ver `reconfirmacao_Hoteis/roomingList.xlsx` de referência)
+- [x] Validação de colunas obrigatórias com mensagem de erro clara se faltar alguma
+- [x] Consolidação por `Localizador` **+ hotel**: linhas do mesmo localizador E mesmo hotel viram 1 registro de reserva com todos os hóspedes agrupados (PRD §4.1, item 2). **Descoberta ao testar com o xlsx real**: o mesmo `Localizador` pode cobrir um roteiro multi-hotel/multi-cidade (ex. `D4D138`: mesmo casal em 4 hotéis diferentes) — caso não coberto literalmente pelo PRD, que só documenta "mesmo hotel, múltiplos hóspedes/quartos" (ex. `9QGJZN`). Decisão tomada nesta sessão: chave de consolidação é `(localizador, hotel)`, não só `localizador` — cada hotel do roteiro vira reserva e e-mail de reconfirmação separados (bate com a constraint `unique(hotel_id, localizador)` já existente desde o Milestone 2, sem precisar de migration nova).
+- [x] Tela de preview: tabela mostrando as reservas que serão importadas, com indicação visual de quais localizadores já existem no banco (dedupe visual simples por `localizador`, já que `hotel_id` fica nulo neste milestone — match real de hotel é Milestone 5)
+- [x] Botão "Confirmar importação" grava em `reconfirmacao.reservations` (ainda sem acionar envio de e-mail)
+- [x] Teste manual com o `roomingList.xlsx` de referência (dado sintético/anonimizado, nunca o arquivo real de produção — PRD §7), ponta a ponta via Playwright com usuário de teste `consultor@tripquote.dev`: login → upload → preview (58 reservas consolidadas) → confirmar importação (57 gravadas, 1 pulada por dedupe) → limpeza dos dados de teste e da senha temporária ao final
 
-**Commit final:** `feat: upload e preview de RoomingList com consolidação por localizador`
+**Gap descoberto e corrigido nesta sessão (fora do escopo original do Milestone 3, mas bloqueava qualquer leitura/escrita em `reconfirmacao` desde o Milestone 2):** o schema `reconfirmacao` nunca tinha sido exposto em Settings → API → Exposed schemas do Supabase (só `public, graphql_public`), e nenhuma migration anterior tinha dado `GRANT USAGE`/`GRANT SELECT,INSERT,UPDATE` para `authenticated`/`service_role`/`anon` nas tabelas novas — RLS por si só não libera acesso sem esses grants de base. Corrigido via Management API (exposed schemas, mudança aditiva) + nova migration `20261020174225_reconfirmacao_schema_grants.sql` (grants). Sem isso, toda query ao schema `reconfirmacao` falhava com `PGRST106`/`42501` mesmo com as policies RLS corretas — só apareceu ao testar de ponta a ponta com sessão real.
+
+**Commit final:** `feat: upload e preview de RoomingList com consolidação por localizador+hotel`
 
 ---
 
