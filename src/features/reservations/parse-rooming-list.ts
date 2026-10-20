@@ -34,6 +34,15 @@ export type ReservaConsolidada = {
   linhasOriginais: number;
 };
 
+// Preenchido depois do parsing (rota de preview), ao ligar a reserva ao
+// banco de contatos de hotéis (Milestone 5) — não faz parte do parsing puro.
+export type ReservaConsolidadaComHotel = ReservaConsolidada & {
+  hotelId: string | null;
+  hotelMatchConfianca: number;
+  jaProcessado: boolean;
+  jaProcessadoEm: string | null;
+};
+
 export type ParseRoomingListResult =
   | { ok: true; reservas: ReservaConsolidada[] }
   | { ok: false; erro: string; colunasFaltantes?: string[]; colunasEncontradas?: string[] };

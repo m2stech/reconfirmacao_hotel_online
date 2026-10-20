@@ -134,11 +134,19 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Tela de gestão do banco de contatos de hotéis (feature nova em relação ao sistema de referência) e a lógica de deduplicação de envio por localizador, ainda com busca de e-mail/país manual (a automação via Tavily entra no Milestone 8).
 
 **Entregas:**
-- [ ] Tela `/hoteis` listando hotéis cadastrados: nome, e-mail(s), país, idioma, confiabilidade do contato, última confirmação
-- [ ] CRUD manual de hotel (criar, editar e-mail/país, marcar como confirmado/obsoleto)
-- [ ] Ação de mesclar hotéis duplicados (mesmo hotel, nomes/grafias diferentes)
-- [ ] Na tela de preview de importação (Milestone 3), ligar cada reserva ao hotel correspondente na base — exato ou fuzzy match simples (matching mais sofisticado fica para o Milestone 8)
-- [ ] Reservas cujo localizador já tem envio registrado aparecem marcadas como "já processado em [data]" no preview de importação (deduplicação, PRD §4.2, item 4) — ainda sem bloquear, só sinalizar, até o Milestone 7 implementar o bloqueio real de reenvio
+- [x] Tela `/hoteis` listando hotéis cadastrados: nome, e-mail(s), país, idioma, confiabilidade do contato, última confirmação
+- [x] CRUD manual de hotel (criar, editar e-mail/país, marcar como confirmado/obsoleto)
+- [x] Ação de mesclar hotéis duplicados (mesmo hotel, nomes/grafias diferentes)
+- [x] Na tela de preview de importação (Milestone 3), ligar cada reserva ao hotel correspondente na base — exato ou fuzzy match simples (matching mais sofisticado fica para o Milestone 8)
+- [x] Reservas cujo localizador já tem envio registrado aparecem marcadas como "já processado em [data]" no preview de importação (deduplicação, PRD §4.2, item 4) — ainda sem bloquear, só sinalizar, até o Milestone 7 implementar o bloqueio real de reenvio
+
+**Mudança de modelagem nesta sessão:** a chave de dedupe do preview/confirmação de importação (`src/app/api/reservations/import/{preview,confirm}/route.ts`) deixou de ser `(localizador, check-in, check-out)` (aproximação provisória do Milestone 3, antes de existir matching de hotel) e passou a ser `(localizador, hotel_id)` — a chave real de consolidação do domínio, que bate com a constraint `unique(hotel_id, localizador)` já existente desde o Milestone 2. Reserva cujo hotel ainda não tem match no banco cai num fallback por `(localizador, nome do hotel)`, já que não há `hotel_id` para comparar.
+
+**Lacuna de RLS corrigida nesta sessão:** a migration `20261020200000_reconfirmacao_hotels_delete_policy.sql` adiciona a policy de DELETE em `hotels`/`hotel_emails` que faltava desde o Milestone 2 (necessária para `mesclarHoteis`). O agente `supabase-rls-reviewer` apontou que a policy sozinha não bastava — faltava também o `GRANT DELETE` correspondente (mesmo padrão de lacuna já visto nas migrations `174225`/`151500` dos Milestones 2/3: RLS só é avaliada depois do GRANT de tabela existir). Corrigido na mesma migration antes do merge. O reviewer também registrou uma assimetria de integridade para avaliar no Milestone 6: DELETE direto em `hotels` fora do fluxo de merge falha com violação de FK se houver reservas vinculadas (seguro, mas erro cru), mas cascateia e apaga e-mails vinculados silenciosamente (sem reatribuição) — nenhum dos dois é "mesclar".
+
+**Bug de UI corrigido durante o teste manual (Playwright, usuário `consultor@tripquote.dev`):** no dialog de mesclagem (`src/app/hoteis/merge-hotel-dialog.tsx`), o `Select` de "hotel principal" usa o `id` (UUID) do hotel como `value` — mas o componente `Select` do projeto (`@base-ui/react/select`) só mostra automaticamente o `value` bruto quando `SelectValue` não recebe `children`, então o UUID aparecia cru na tela em vez do nome do hotel escolhido. Corrigido passando uma função em `SelectValue` (`{(valor) => hoteis.find(...)?.nome}`), conforme a API documentada do Base UI. Os demais `Select` do projeto não tinham esse problema porque usam enums já legíveis como `value` (ex. `confiabilidade_contato`), não UUIDs.
+
+**Teste manual (Playwright, usuário `consultor@tripquote.dev`):** criação de hotel → criação de hotel duplicado → mesclagem (reservas/e-mails reatribuídos, duplicado excluído, confirmado por contagem antes/depois) → upload do `roomingList.xlsx` de referência (58 reservas consolidadas, matching fuzzy confirmado com um hotel cadastrado propositalmente com nome variante — "W Prague Hotel LTDA" casou com "W Prague" do xlsx) → confirmação da importação → reupload do mesmo arquivo confirmando a sinalização "Já processado em [data]" na reserva com hotel resolvido. Dados sintéticos de teste (hotéis e reservas criados durante o teste) removidos ao final; banco voltou ao estado do seed original do Milestone 2.
 
 **Commit final:** `feat: banco de contatos de hotéis e sinalização de reserva já processada`
 
