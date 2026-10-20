@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import type { ReservaConsolidada } from "@/features/reservations/parse-rooming-list";
+import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
 
 type ConfirmarImportacaoBody = {
   arquivoNome: string;
-  reservas: ReservaConsolidada[];
+  reservas: ReservaConsolidadaComHotel[];
 };
 
 export async function POST(request: NextRequest) {
@@ -21,19 +21,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, erro: "Nenhuma reserva para importar." }, { status: 400 });
   }
 
-  // Chave de dedupe é (localizador, check-in, check-out) — não só
-  // localizador: um mesmo Localizador pode cobrir um roteiro multi-hotel
-  // (ver parseRoomingList), então duas linhas com o mesmo localizador mas
-  // datas diferentes são hotéis/trechos distintos, não duplicata. hotel_id
-  // ainda não está disponível como critério (fica nulo até o Milestone 5).
-  const chaveDedupe = (localizador: string, checkin: string | null, checkout: string | null) =>
-    `${localizador}::${checkin ?? ""}::${checkout ?? ""}`;
+  // Chave de dedupe é (localizador, hotel) — a chave real de consolidação do
+  // domínio (Milestone 5), que bate com a constraint unique(hotel_id,
+  // localizador) da tabela. Reserva sem hotel_id resolvido cai no fallback
+  // por nome do hotel, já que não há hotel_id para comparar ainda.
+  const chaveDedupe = (localizador: string, hotelId: string | null, hotelNome: string) =>
+    `${localizador}::${hotelId ?? `nome:${hotelNome}`}`;
 
   const localizadores = body.reservas.map((reserva) => reserva.localizador);
   const { data: existentes, error: erroConsulta } = await supabase
     .schema("reconfirmacao")
     .from("reservations")
-    .select("localizador, data_checkin, data_checkout")
+    .select("localizador, hotel_id, hotels(nome)")
     .in("localizador", localizadores);
 
   if (erroConsulta) {
@@ -41,10 +40,14 @@ export async function POST(request: NextRequest) {
   }
 
   const jaExistentes = new Set(
-    (existentes ?? []).map((linha) => chaveDedupe(linha.localizador, linha.data_checkin, linha.data_checkout))
+    (existentes ?? []).map((linha) => {
+      const hotelRelacionado = Array.isArray(linha.hotels) ? linha.hotels[0] : linha.hotels;
+      const nomeHotel = (hotelRelacionado as { nome: string } | undefined)?.nome ?? "";
+      return chaveDedupe(linha.localizador, linha.hotel_id, nomeHotel);
+    })
   );
   const novasReservas = body.reservas.filter(
-    (reserva) => !jaExistentes.has(chaveDedupe(reserva.localizador, reserva.dataCheckin, reserva.dataCheckout))
+    (reserva) => !jaExistentes.has(chaveDedupe(reserva.localizador, reserva.hotelId, reserva.hotelNome))
   );
 
   if (novasReservas.length === 0) {
@@ -59,6 +62,7 @@ export async function POST(request: NextRequest) {
   const linhasParaInserir = novasReservas.map((reserva) => ({
     localizador: reserva.localizador,
     localizador_externo: reserva.localizadorExterno,
+    hotel_id: reserva.hotelId,
     fornecedor: reserva.fornecedor,
     data_checkin: reserva.dataCheckin,
     data_checkout: reserva.dataCheckout,

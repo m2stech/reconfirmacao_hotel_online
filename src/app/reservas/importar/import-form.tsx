@@ -13,9 +13,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { ReservaConsolidada } from "@/features/reservations/parse-rooming-list";
+import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
 
-type ReservaPreview = ReservaConsolidada & { jaProcessado: boolean };
+type ReservaPreview = ReservaConsolidadaComHotel;
 
 type EstadoPreview =
   | { status: "vazio" }
@@ -188,7 +188,7 @@ export function ImportForm() {
             <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-28">Status</TableHead>
+                  <TableHead className="w-36">Status</TableHead>
                   <TableHead className="w-28">Localizador</TableHead>
                   <TableHead className="w-64">Hotel</TableHead>
                   <TableHead className="w-24">Check-in</TableHead>
@@ -202,7 +202,12 @@ export function ImportForm() {
                   <TableRow key={`${reserva.localizador}::${reserva.hotelNome}`}>
                     <TableCell>
                       {reserva.jaProcessado ? (
-                        <Badge variant="secondary">Já processado</Badge>
+                        <Badge variant="secondary" title={reserva.jaProcessadoEm ?? undefined}>
+                          Já processado
+                          {reserva.jaProcessadoEm
+                            ? ` em ${new Date(reserva.jaProcessadoEm).toLocaleDateString("pt-BR")}`
+                            : ""}
+                        </Badge>
                       ) : (
                         <Badge>Novo</Badge>
                       )}
@@ -210,6 +215,9 @@ export function ImportForm() {
                     <TableCell className="font-medium">{reserva.localizador}</TableCell>
                     <TableCell className="truncate" title={reserva.hotelNome}>
                       {reserva.hotelNome}
+                      {!reserva.hotelId ? (
+                        <span className="ml-1 text-xs text-muted-foreground">(hotel não cadastrado)</span>
+                      ) : null}
                     </TableCell>
                     <TableCell>{reserva.dataCheckin ?? "—"}</TableCell>
                     <TableCell>{reserva.dataCheckout ?? "—"}</TableCell>
