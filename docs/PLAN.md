@@ -108,13 +108,20 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Dashboard de auditoria completo visualmente e funcionalmente contra os dados de seed/importados — a tela mais usada do sistema de referência, recriada primeiro na UI antes de qualquer integração de e-mail/IA estar pronta.
 
 **Entregas:**
-- [ ] Tela `/dashboard` com cards de métricas (total, confirmadas, aguardando, revisar, respondido ao hotel, erro no envio) — mesmos status do sistema de referência (PRD §4.1, item 5)
-- [ ] Tabela de reservas com paginação/filtro no banco (não client-side — PRD §6), filtros por status/hotel/localizador/data/pagamento/tipo de pendência
-- [ ] Modal de detalhe da reserva: resumo, dados da hospedagem, histórico cronológico da conversa (hotel x nós)
-- [ ] Edição manual de campos de auditoria (status, confirmação, regime alimentar, pagamento, tipo de pendência) com a regra de negócio preservada: não permite marcar `CONFIRMADA` sem regime alimentar confirmado
-- [ ] Toda edição manual grava em `audit_log` com o usuário autenticado (PRD §3 — auditoria por usuário)
-- [ ] Exportação para Excel das reservas filtradas/selecionadas
-- [ ] Cliques nos cards de métrica aplicam o filtro de status correspondente (paridade com o app de referência)
+- [x] Tela `/dashboard` com cards de métricas (total, confirmadas, aguardando, revisar, respondido ao hotel, erro no envio) — mesmos status do sistema de referência (PRD §4.1, item 5)
+- [x] Tabela de reservas com paginação/filtro no banco (não client-side — PRD §6), filtros por status/hotel/localizador/data/pagamento/tipo de pendência
+- [x] Modal de detalhe da reserva: resumo, dados da hospedagem, histórico cronológico da conversa (hotel x nós)
+- [x] Edição manual de campos de auditoria (status, confirmação, regime alimentar, pagamento, tipo de pendência) com a regra de negócio preservada: não permite marcar `CONFIRMADA` sem regime alimentar confirmado
+- [x] Toda edição manual grava em `audit_log` com o usuário autenticado (PRD §3 — auditoria por usuário)
+- [x] Exportação para Excel das reservas filtradas/selecionadas
+- [x] Cliques nos cards de métrica aplicam o filtro de status correspondente (paridade com o app de referência)
+
+**Descoberta de modelagem nesta sessão:** a view `reconfirmacao.audit_status` (Milestone 2) só calcula status a partir de `email_sends`/`hotel_replies` reais, que ainda não existem (Milestones 7/9). Para a edição manual funcionar antes disso — e continuar útil depois, quando o consultor precisar corrigir o cálculo automático —, foram adicionadas colunas de override em `reconfirmacao.reservations` (`status_manual`, `regime_alimentar_confirmado_manual`, `pagamento_manual`, `tipo_pendencia_manual`, `auditoria_atualizada_em/_por`) via migrations `20261020190000` e `20261020191000` (a segunda expõe `data_checkin`/`data_checkout` na view para permitir filtro de data no banco). A view foi ajustada para dar prioridade ao override manual (`coalesce(status_manual, <cálculo automático>)`) sobre o cálculo automático.
+
+**Bugs corrigidos durante o teste manual (Playwright, usuário `consultor@tripquote.dev`):**
+- O PATCH de edição manual gravava em `public.audit_log` usando o client de sessão (`anon`/`authenticated`), mas essa tabela não tem policy de INSERT para esses roles (CLAUDE.md: "Todo insert é feito com `SUPABASE_SERVICE_ROLE_KEY` no backend"). O insert falhava silenciosamente (erro do Supabase não checado) e nenhuma auditoria era registrada. Corrigido trocando para `createServiceRoleClient()` nesse insert específico — a atualização da própria reserva continua usando o client de sessão normal (RLS já libera isso para qualquer usuário autenticado ativo).
+- `npm run build` falhava em `/dashboard` com "Next.js encountered uncached or runtime data during prerendering" (Cache Components do Next 16): a consulta de métricas (`buscarMetricas`) rodava direto no corpo da página, fora de `<Suspense>`. Corrigido extraindo para um Server Component próprio (`metric-cards.tsx`) envolvido em `<Suspense>`, com fallback de cards "—" enquanto carrega — mesmo padrão já usado para `AuditTable`.
+- Label do checkbox "Regime alimentar confirmado" não era clicável (o componente `Label` do shadcn não associa `htmlFor`/`id` automaticamente); trocado por um `<label>` nativo envolvendo o `Checkbox`.
 
 **Commit final:** `feat: dashboard de auditoria com filtros, edição manual e exportação`
 

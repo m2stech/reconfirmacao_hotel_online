@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -612,6 +612,8 @@ export type Database = {
       }
       reservations: {
         Row: {
+          auditoria_atualizada_em: string | null
+          auditoria_atualizada_por: string | null
           created_at: string
           created_by: string | null
           data_checkin: string | null
@@ -622,12 +624,20 @@ export type Database = {
           id: string
           localizador: string
           localizador_externo: string | null
+          pagamento_manual: string | null
           regime_alimentar: string | null
+          regime_alimentar_confirmado_manual: boolean | null
           roomlist_arquivo: string | null
+          status_manual:
+            | Database["reconfirmacao"]["Enums"]["audit_status_manual"]
+            | null
           tipo_habitacao: string | null
+          tipo_pendencia_manual: string | null
           updated_at: string
         }
         Insert: {
+          auditoria_atualizada_em?: string | null
+          auditoria_atualizada_por?: string | null
           created_at?: string
           created_by?: string | null
           data_checkin?: string | null
@@ -638,12 +648,20 @@ export type Database = {
           id?: string
           localizador: string
           localizador_externo?: string | null
+          pagamento_manual?: string | null
           regime_alimentar?: string | null
+          regime_alimentar_confirmado_manual?: boolean | null
           roomlist_arquivo?: string | null
+          status_manual?:
+            | Database["reconfirmacao"]["Enums"]["audit_status_manual"]
+            | null
           tipo_habitacao?: string | null
+          tipo_pendencia_manual?: string | null
           updated_at?: string
         }
         Update: {
+          auditoria_atualizada_em?: string | null
+          auditoria_atualizada_por?: string | null
           created_at?: string
           created_by?: string | null
           data_checkin?: string | null
@@ -654,9 +672,15 @@ export type Database = {
           id?: string
           localizador?: string
           localizador_externo?: string | null
+          pagamento_manual?: string | null
           regime_alimentar?: string | null
+          regime_alimentar_confirmado_manual?: boolean | null
           roomlist_arquivo?: string | null
+          status_manual?:
+            | Database["reconfirmacao"]["Enums"]["audit_status_manual"]
+            | null
           tipo_habitacao?: string | null
+          tipo_pendencia_manual?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -673,6 +697,10 @@ export type Database = {
     Views: {
       audit_status: {
         Row: {
+          auditoria_atualizada_em: string | null
+          auditoria_atualizada_por: string | null
+          data_checkin: string | null
+          data_checkout: string | null
           hotel_id: string | null
           hotel_nome: string | null
           last_email_send_at: string | null
@@ -683,10 +711,12 @@ export type Database = {
           last_hotel_reply_at: string | null
           last_hotel_reply_id: string | null
           localizador: string | null
+          pagamento_manual: string | null
           regime_alimentar_confirmado: boolean | null
           reserva_confirmada: boolean | null
           reservation_id: string | null
           status: string | null
+          tipo_pendencia_manual: string | null
         }
         Relationships: [
           {
@@ -703,6 +733,14 @@ export type Database = {
       is_active_authenticated_user: { Args: never; Returns: boolean }
     }
     Enums: {
+      audit_status_manual:
+        | "CONFIRMADA"
+        | "AGUARDANDO_RESPOSTA"
+        | "REVISAR"
+        | "REVISAR_DIVERGENCIA"
+        | "RESPONDIDO_AO_HOTEL"
+        | "ERRO_NO_ENVIO"
+        | "NAO_CONFIRMADA"
       contact_reliability: "confirmado" | "sugerido" | "obsoleto"
       contact_source: "manual" | "tavily"
       email_send_kind: "reconfirmacao_inicial" | "reenvio" | "resposta_manual"
@@ -842,6 +880,15 @@ export const Constants = {
   },
   reconfirmacao: {
     Enums: {
+      audit_status_manual: [
+        "CONFIRMADA",
+        "AGUARDANDO_RESPOSTA",
+        "REVISAR",
+        "REVISAR_DIVERGENCIA",
+        "RESPONDIDO_AO_HOTEL",
+        "ERRO_NO_ENVIO",
+        "NAO_CONFIRMADA",
+      ],
       contact_reliability: ["confirmado", "sugerido", "obsoleto"],
       contact_source: ["manual", "tavily"],
       email_send_kind: ["reconfirmacao_inicial", "reenvio", "resposta_manual"],
