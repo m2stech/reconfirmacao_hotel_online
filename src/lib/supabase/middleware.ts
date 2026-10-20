@@ -42,7 +42,7 @@ export async function updateSession(request: NextRequest) {
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("active")
+      .select("active, role")
       .eq("id", user.id)
       .single();
 
@@ -51,6 +51,10 @@ export async function updateSession(request: NextRequest) {
     }
 
     if (request.nextUrl.pathname === "/login") {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+
+    if (request.nextUrl.pathname.startsWith("/admin") && profile?.role !== "admin") {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
