@@ -41,6 +41,8 @@ export function UsersTable({ usuarioAtualId }: { usuarioAtualId: string }) {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [emailConvite, setEmailConvite] = useState("");
+  const [nomeConvite, setNomeConvite] = useState("");
+  const [roleConvite, setRoleConvite] = useState<"consultant" | "admin">("consultant");
   const [convidando, setConvidando] = useState(false);
   const [atualizandoId, setAtualizandoId] = useState<string | null>(null);
 
@@ -68,13 +70,17 @@ export function UsersTable({ usuarioAtualId }: { usuarioAtualId: string }) {
   }, []);
 
   async function convidar() {
-    if (!emailConvite.trim()) return;
+    if (!emailConvite.trim() || !nomeConvite.trim()) return;
     setConvidando(true);
     try {
       const resposta = await fetch("/api/admin/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: emailConvite.trim() }),
+        body: JSON.stringify({
+          email: emailConvite.trim(),
+          fullName: nomeConvite.trim(),
+          role: roleConvite,
+        }),
       });
       const dados = await resposta.json();
       if (!dados.ok) {
@@ -83,6 +89,8 @@ export function UsersTable({ usuarioAtualId }: { usuarioAtualId: string }) {
       }
       toast.success("Convite enviado.");
       setEmailConvite("");
+      setNomeConvite("");
+      setRoleConvite("consultant");
       carregar();
     } catch {
       toast.error("Falha de rede ao convidar usuário.");
@@ -116,9 +124,21 @@ export function UsersTable({ usuarioAtualId }: { usuarioAtualId: string }) {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end gap-3 border-b border-border pb-4">
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="convite-nome" className="text-xs text-muted-foreground">
+            Nome
+          </Label>
+          <Input
+            id="convite-nome"
+            value={nomeConvite}
+            onChange={(event) => setNomeConvite(event.target.value)}
+            placeholder="Nome completo"
+            className="w-48"
+          />
+        </div>
         <div className="flex flex-1 flex-col gap-1">
           <Label htmlFor="convite-email" className="text-xs text-muted-foreground">
-            Convidar novo usuário
+            E-mail
           </Label>
           <Input
             id="convite-email"
@@ -128,7 +148,24 @@ export function UsersTable({ usuarioAtualId }: { usuarioAtualId: string }) {
             placeholder="nome@bvgroup.com.br"
           />
         </div>
-        <Button onClick={convidar} disabled={convidando || !emailConvite.trim()}>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="convite-role" className="text-xs text-muted-foreground">
+            Papel
+          </Label>
+          <Select value={roleConvite} onValueChange={(valor) => setRoleConvite(valor as "consultant" | "admin")}>
+            <SelectTrigger id="convite-role" className="w-40">
+              <SelectValue>{ROLE_LABEL[roleConvite]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(ROLE_LABEL).map(([valor, label]) => (
+                <SelectItem key={valor} value={valor}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button onClick={convidar} disabled={convidando || !emailConvite.trim() || !nomeConvite.trim()}>
           {convidando ? "Convidando..." : "Convidar"}
         </Button>
       </div>

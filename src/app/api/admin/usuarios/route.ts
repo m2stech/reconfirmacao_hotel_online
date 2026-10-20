@@ -25,12 +25,17 @@ export async function POST(request: NextRequest) {
 
   const corpo = await request.json();
   const email: string | undefined = corpo.email?.trim();
+  const fullName: string | undefined = corpo.fullName?.trim();
+  const role: "consultant" | "admin" = corpo.role === "admin" ? "admin" : "consultant";
 
   if (!email) {
     return NextResponse.json({ ok: false, erro: "E-mail é obrigatório." }, { status: 400 });
   }
+  if (!fullName) {
+    return NextResponse.json({ ok: false, erro: "Nome é obrigatório." }, { status: 400 });
+  }
 
-  const { data, error } = await convidarUsuario(email);
+  const { data, error } = await convidarUsuario(email, { fullName, role });
   if (error) {
     return NextResponse.json({ ok: false, erro: error.message || "Falha ao convidar usuário." }, { status: 500 });
   }
@@ -40,8 +45,8 @@ export async function POST(request: NextRequest) {
     actor_id: guard.user.id,
     action: "user_invited",
     entity_type: "profile",
-    entity_id: data.user?.id,
-    metadata: { email },
+    entity_id: data?.user?.id,
+    metadata: { email, fullName, role },
   });
   if (erroAuditLog) {
     console.error("Falha ao gravar audit_log (user_invited):", erroAuditLog);
