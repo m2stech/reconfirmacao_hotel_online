@@ -60,15 +60,21 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Todas as tabelas novas do domínio criadas no schema `reconfirmacao`, com RLS desde o primeiro commit — é a base de dados que as telas dos próximos milestones vão consumir (inicialmente com dados de teste inseridos manualmente, antes de qualquer integração externa real).
 
 **Entregas:**
-- [ ] Migration `reconfirmacao.hotels` (nome, variações de nome, e-mail(s), país, idioma, confiabilidade do contato, última confirmação, histórico de bounce)
-- [ ] Migration `reconfirmacao.reservations` (localizador, localizador externo, hóspedes/pax, datas, tipo de habitação, regime alimentar, fornecedor, `hotel_id` FK)
-- [ ] Migration `reconfirmacao.email_sends` (reserva/localizador, destinatário, assunto, graph ids, status, tipo de envio inicial/resposta manual, `created_by` FK `profiles`)
-- [ ] Migration `reconfirmacao.hotel_replies` (resposta recebida, campos extraídos pela IA, custo/tokens, método de interpretação)
-- [ ] Migration `reconfirmacao.audit_status` (tabela ou view derivada consolidando status por localizador)
-- [ ] Constraint de idempotência: unique key em `email_sends`/`hotel_replies` por identificador do Graph (`internet_message_id` ou equivalente) — não só verificação em código
-- [ ] RLS em todas as tabelas: `consultant` e `admin` leem tudo (visão compartilhada, PRD §3); somente admin ou service role escreve configuração sensível
-- [ ] Agente `supabase-rls-reviewer` executado e aprovado antes de mergear
-- [ ] Seed de dados sintéticos (hotel fictício, reserva fictícia) para popular as telas dos próximos milestones sem depender de dado real
+- [x] Migration `reconfirmacao.hotels` (nome, variações de nome, país, idioma, confiabilidade do contato, última confirmação) + `reconfirmacao.hotel_emails` (e-mail(s), histórico de bounce — tabela separada para suportar múltiplos e-mails/fonte por hotel)
+- [x] Migration `reconfirmacao.reservations` (localizador, localizador externo, hóspedes/pax em jsonb, datas, tipo de habitação, regime alimentar, fornecedor, `hotel_id` FK)
+- [x] Migration `reconfirmacao.email_sends` (reserva/localizador, destinatário, assunto, graph ids, status, tipo de envio inicial/resposta manual, `created_by` FK `profiles`)
+- [x] Migration `reconfirmacao.hotel_replies` (resposta recebida, campos extraídos pela IA, custo/tokens, método de interpretação)
+- [x] Migration `reconfirmacao.audit_status` — **view** derivada (não tabela), consolidando status básico por reserva a partir de `reservations`/`email_sends`/`hotel_replies`; lógica completa de regras de negócio (CONFIRMADA exige regime alimentar confirmado, REVISAR DIVERGÊNCIA, etc.) fica para o Milestone 9
+- [x] Constraint de idempotência: `unique(internet_message_id)` em `email_sends` e `hotel_replies`
+- [x] RLS em todas as tabelas (`hotels`, `hotel_emails`, `reservations`, `email_sends`, `hotel_replies`): visão de SELECT compartilhada para todo usuário autenticado ativo (PRD §3), sem filtro por autor; escrita (INSERT/UPDATE) também liberada a qualquer usuário ativo — não há ainda operação restrita a admin neste milestone (entra no Milestone 6)
+- [x] Agente `supabase-rls-reviewer` executado — **aprovado com ressalvas**; ressalva bloqueante (ausência de policy de UPDATE em `email_sends` para o fluxo de bounce) corrigida na migration `20261020151500_reconfirmacao_rls_hardening.sql`, que também restringe `EXECUTE` da função auxiliar a `authenticated`. Ressalvas não bloqueantes documentadas abaixo para milestones futuros.
+- [x] Seed de dados sintéticos (hotel fictício "Hotel Fictício Praia Azul", reserva fictícia localizador `9QGJZN`) para popular as telas dos próximos milestones sem depender de dado real
+- [x] Tipos TypeScript gerados via `supabase gen types` em `src/lib/supabase/types.ts` (schemas `public` + `reconfirmacao`)
+
+**Notas para milestones futuros (não bloqueiam este milestone):**
+- `hotel_replies` não tem policy de UPDATE (intencional: resposta do hotel é fato histórico imutável; tréplica gera nova linha).
+- Milestone 5 (mesclar hotéis duplicados) vai precisar de policy de DELETE em `hotels`/`hotel_emails`, inexistente hoje.
+- Exclusão de usuário em `profiles` é sempre lógica (`active = false`), nunca física — os FKs `created_by`/`ultima_confirmacao_por` sem `on delete` explícito dependem dessa convenção se mantendo.
 
 **Commit final:** `feat: schema reconfirmacao com RLS (hotels, reservations, email_sends, hotel_replies, audit_status)`
 
