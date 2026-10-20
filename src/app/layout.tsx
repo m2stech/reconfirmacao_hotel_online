@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
 
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="pt-BR" className="h-full antialiased">
       <body className="flex min-h-full flex-col bg-background text-foreground">
-        <SiteHeader />
+        <Suspense fallback={<div className="h-16 border-b border-sidebar-border bg-sidebar" />}>
+          <SiteHeader />
+        </Suspense>
         {children}
       </body>
     </html>

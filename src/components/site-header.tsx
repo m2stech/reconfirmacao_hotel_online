@@ -1,6 +1,10 @@
 import Link from "next/link";
+import { getCurrentUserWithProfile } from "@/lib/supabase/profile";
+import { UserMenu } from "@/components/user-menu";
 
-export function SiteHeader() {
+export async function SiteHeader() {
+  const { user, profile } = await getCurrentUserWithProfile();
+
   return (
     <header className="sticky top-0 z-40 border-b border-sidebar-border bg-sidebar text-sidebar-foreground">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
@@ -11,17 +15,27 @@ export function SiteHeader() {
           <span className="text-sm sm:text-base">Snow Reconfirmação</span>
         </Link>
 
-        <nav className="hidden items-center gap-6 text-sm sm:flex">
-          <Link href="/dashboard" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
-            Dashboard
-          </Link>
-          <Link href="/reservas/importar" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
-            Importar
-          </Link>
-          <Link href="/hoteis" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
-            Hotéis
-          </Link>
-        </nav>
+        {user ? (
+          <div className="flex items-center gap-6">
+            <nav className="hidden items-center gap-6 text-sm sm:flex">
+              <Link href="/dashboard" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                Dashboard
+              </Link>
+              <Link href="/reservas/importar" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                Importar
+              </Link>
+              <Link href="/hoteis" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                Hotéis
+              </Link>
+              {profile?.role === "admin" ? (
+                <Link href="/admin/usuarios" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                  Admin
+                </Link>
+              ) : null}
+            </nav>
+            <UserMenu name={profile?.full_name ?? user.email ?? ""} />
+          </div>
+        ) : null}
       </div>
     </header>
   );

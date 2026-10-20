@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // App desktop legado (NiceGUI), não faz parte deste projeto Next.js.
+    "reconfirmacao_Hoteis/**",
   ]),
 ]);
 
