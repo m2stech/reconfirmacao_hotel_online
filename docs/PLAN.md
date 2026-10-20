@@ -36,16 +36,18 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Login funcional via Supabase Auth, reusando `public.profiles` do TripQuote — qualquer usuário já cadastrado no TripQuote consegue entrar aqui com a mesma conta, e o papel (`consultant`/`admin`) já vem pronto.
 
 **Entregas:**
-- [ ] Tela de login (`/login`) com e-mail/senha via Supabase Auth, estilo SNOW
-- [ ] Fluxo de "esqueci minha senha": tela `/esqueci-senha` (solicita e-mail de reset via Supabase Auth) + tela `/redefinir-senha` (define nova senha a partir do link recebido por e-mail)
+- [x] Tela de login (`/login`) com e-mail/senha via Supabase Auth, estilo SNOW
+- [x] Fluxo de "esqueci minha senha": tela `/esqueci-senha` (solicita e-mail de reset via Supabase Auth) + tela `/redefinir-senha` (define nova senha a partir do link recebido por e-mail)
   - **Atenção (schema compartilhado com o TripQuote):** `Site URL`/`Redirect URLs` em Authentication → URL Configuration são config **por projeto Supabase**, não por schema — não existe "URL por schema". Hoje o `Site URL` aponta para o domínio do TripQuote/SnowQuote (`https://snowquote.vercel.app/`). Para não redirecionar o reset de senha deste sistema para lá, sem mexer no `Site URL` do TripQuote: (1) adicionar `http://localhost:3000/redefinir-senha` (porta do `npm run dev`) na lista de **Redirect URLs** — é o único domínio deste sistema até a Milestone 13 (deploy), não há domínio de produção ainda; (2) toda chamada de `resetPasswordForEmail()` no código deste sistema deve passar `redirectTo` explicitamente apontando para essa URL — nunca depender do `Site URL` padrão. Quando o deploy acontecer (Milestone 13), trocar/adicionar o domínio de produção na mesma lista e no `redirectTo`.
+    - **Pendente de ação manual:** a alteração de `Redirect URLs`/`Site URL` do projeto Supabase é uma mudança de infraestrutura compartilhada (afeta também o TripQuote) e foi bloqueada pelo classificador de permissões do Claude Code — precisa ser feita manualmente em Authentication → URL Configuration, adicionando `http://localhost:3000/redefinir-senha` a Redirect URLs, sem alterar o Site URL existente. O código já está pronto (`redirectTo` explícito em `resetPasswordForEmail()`), só falta essa config no painel do Supabase.
   - Revisar o template de e-mail de reset (Authentication → Emails) para confirmar que não menciona "SnowQuote"/TripQuote especificamente, já que agora serve os dois produtos
-- [ ] Middleware/guard de rota: páginas internas exigem sessão válida, redirecionam para `/login` se não autenticado
-- [ ] Leitura do papel do usuário autenticado a partir de `public.profiles` (sem criar tabela nova — reuso puro)
-- [ ] Tela/estado de "usuário inativo" (campo `active = false` em `profiles`) — bloqueia acesso com mensagem clara, sem apagar sessão de outros usuários
-- [ ] Header exibe nome do usuário logado e opção de logout
-- [ ] Navegação condicional: itens exclusivos de admin (ver Milestone 6) só aparecem para `role = admin`
-- [ ] Teste manual: logar com um usuário `consultant` existente do TripQuote e confirmar que entra sem precisar criar conta nova
+    - **Pendente:** verificado que o template atual menciona "SnowQuote" explicitamente (assunto "Redefinir sua senha — SnowQuote" e logo/texto no corpo). Como é um template compartilhado entre os dois produtos, ajustar o texto é uma decisão de produto/conteúdo que depende de alinhamento com o time — não alterado nesta sessão, só diagnosticado.
+- [x] Middleware/guard de rota: páginas internas exigem sessão válida, redirecionam para `/login` se não autenticado
+- [x] Leitura do papel do usuário autenticado a partir de `public.profiles` (sem criar tabela nova — reuso puro)
+- [x] Tela/estado de "usuário inativo" (campo `active = false` em `profiles`) — bloqueia acesso com mensagem clara, sem apagar sessão de outros usuários
+- [x] Header exibe nome do usuário logado e opção de logout
+- [x] Navegação condicional: itens exclusivos de admin (ver Milestone 6) só aparecem para `role = admin`
+- [x] Teste manual: logar com um usuário `consultant` existente do TripQuote e confirmar que entra sem precisar criar conta nova
 
 **Commit final:** `feat: autenticação via Supabase Auth reusando profiles do TripQuote`
 
