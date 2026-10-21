@@ -44,3 +44,16 @@ export async function listarRespostasDaReserva(supabase: TypedClient, emailSendI
   if (error) throw error;
   return data ?? [];
 }
+
+/**
+ * Todos os `internet_message_id` já registrados em `hotel_replies` — usado
+ * para não reprocessar, numa conversa longa, uma mensagem já registrada
+ * para outro envio da mesma reserva (portado de `ler_historico_respostas`
+ * em respostas.py).
+ */
+export async function listarInternetMessageIdsConhecidos(supabase: TypedClient): Promise<Set<string>> {
+  const { data, error } = await supabase.schema("reconfirmacao").from("hotel_replies").select("internet_message_id");
+
+  if (error) throw error;
+  return new Set((data ?? []).map((linha) => linha.internet_message_id));
+}

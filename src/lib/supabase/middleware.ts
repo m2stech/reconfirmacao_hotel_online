@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm", "/inativo"];
+// /api/jobs/* não usa sessão de usuário — é disparado pelo Vercel Cron sem
+// cookie algum, autenticado pelo próprio Route Handler via CRON_SECRET
+// (src/lib/jobs/cron-auth.ts). Sem essa exceção, o middleware redirecionaria
+// o disparo do cron para /login antes de o Route Handler rodar.
+const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm", "/inativo", "/api/jobs"];
 
 function isPublicPath(pathname: string) {
   return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

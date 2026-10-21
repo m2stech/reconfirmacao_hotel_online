@@ -71,7 +71,7 @@ const CASOS = [
       pais: "Estados Unidos",
     },
   },
-] as const;
+];
 
 async function main() {
   console.log(`Enviando 3 e-mails de teste (PT/ES/EN) para ${DESTINATARIO_REVISAO}...\n`);
