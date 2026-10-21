@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/jobs/ler-respostas",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/jobs/enviar-pendentes",
-      "schedule": "0 * * * *"
+      "schedule": "0 10 * * *"
     }
   ]
 }
