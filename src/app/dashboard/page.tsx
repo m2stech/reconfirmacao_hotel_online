@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCards } from "./metric-cards";
 import { AuditTable } from "./audit-table";
+import { VerificarRespostasButton } from "./verificar-respostas-button";
 
 function MetricCardsFallback() {
   return (
@@ -25,8 +26,9 @@ export default function DashboardPage() {
       </Suspense>
 
       <Card className="snow-card">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Reservas</CardTitle>
+          <VerificarRespostasButton />
         </CardHeader>
         <CardContent>
           <Suspense fallback={<p className="text-sm text-muted-foreground">Carregando...</p>}>
