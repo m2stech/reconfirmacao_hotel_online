@@ -55,6 +55,7 @@ export function HotelFormDialog({
   const [estado, setEstado] = useState<EstadoSalvar>({ status: "idle" });
   const [adicionandoEmail, setAdicionandoEmail] = useState(false);
   const [marcandoObsoletoId, setMarcandoObsoletoId] = useState<string | null>(null);
+  const [confirmandoId, setConfirmandoId] = useState<string | null>(null);
 
   async function salvar() {
     if (!nome.trim()) {
@@ -123,6 +124,33 @@ export function HotelFormDialog({
       toast.error("Falha de rede ao adicionar e-mail.");
     } finally {
       setAdicionandoEmail(false);
+    }
+  }
+
+  async function confirmarEmail(emailId: string) {
+    if (!hotel) return;
+    setConfirmandoId(emailId);
+    try {
+      const resposta = await fetch(`/api/hoteis/${hotel.id}/emails/${emailId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acao: "confirmar" }),
+      });
+      const dados = await resposta.json();
+      if (!dados.ok) {
+        toast.error(dados.erro ?? "Falha ao confirmar e-mail.");
+        return;
+      }
+      setEmails((atual) =>
+        atual.map((email) => (email.id === emailId ? { ...email, confiabilidade: "confirmado" } : email))
+      );
+      setConfiabilidadeContato("confirmado");
+      toast.success("E-mail confirmado — já pode ser usado para envio.");
+      onSaved();
+    } catch {
+      toast.error("Falha de rede ao confirmar e-mail.");
+    } finally {
+      setConfirmandoId(null);
     }
   }
 
@@ -218,6 +246,10 @@ export function HotelFormDialog({
           {ehEdicao ? (
             <div className="flex flex-col gap-2 border-t border-border pt-3">
               <Label>E-mails cadastrados</Label>
+              <p className="text-xs text-muted-foreground">
+                E-mail &quot;Sugerido&quot; (encontrado automaticamente) só é usado para envio depois de
+                confirmado — clique em &quot;Confirmar&quot; após verificar que o endereço está correto.
+              </p>
               {emails.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum e-mail cadastrado.</p>
               ) : (
@@ -232,17 +264,30 @@ export function HotelFormDialog({
                           {CONFIABILIDADE_LABEL[email.confiabilidade] ?? email.confiabilidade}
                         </Badge>
                       </div>
-                      {email.confiabilidade !== "obsoleto" ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          disabled={marcandoObsoletoId === email.id}
-                          onClick={() => marcarObsoleto(email.id)}
-                        >
-                          {marcandoObsoletoId === email.id ? "Marcando..." : "Marcar obsoleto"}
-                        </Button>
-                      ) : null}
+                      <div className="flex items-center gap-1">
+                        {email.confiabilidade === "sugerido" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={confirmandoId === email.id}
+                            onClick={() => confirmarEmail(email.id)}
+                          >
+                            {confirmandoId === email.id ? "Confirmando..." : "Confirmar"}
+                          </Button>
+                        ) : null}
+                        {email.confiabilidade !== "obsoleto" ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={marcandoObsoletoId === email.id}
+                            onClick={() => marcarObsoleto(email.id)}
+                          >
+                            {marcandoObsoletoId === email.id ? "Marcando..." : "Marcar obsoleto"}
+                          </Button>
+                        ) : null}
+                      </div>
                     </li>
                   ))}
                 </ul>

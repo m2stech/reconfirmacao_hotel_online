@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
 import { enviarReconfirmacaoInicial } from "@/features/email-sends/send";
 import { criarHotelComEnriquecimentoTavily } from "@/features/hotels/enrich";
+import { buscarHoteisParaMatch } from "@/features/hotels/queries";
+import { encontrarMelhorMatch } from "@/features/hotels/match";
 
 type ConfirmarImportacaoBody = {
   arquivoNome: string;
@@ -30,18 +32,51 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, erro: "Nenhuma reserva para importar." }, { status: 400 });
   }
 
+  // Resolve o hotel_id real de cada reserva ANTES de checar dedupe — nunca
+  // confiar cegamente no reserva.hotelId do payload, que vem do preview
+  // gerado no client e pode estar desatualizado (ex. consultor confirma a
+  // mesma importação duas vezes sem recarregar a tela: bug real encontrado
+  // em teste manual do Milestone 8, que duplicou ~47 hotéis e reservas).
+  // Hotel sem match é criado agora, já enriquecido via Tavily numa única
+  // chamada por nome de hotel novo distinto neste upload — o matching fuzzy
+  // é refeito aqui contra o estado atual do banco, nunca contra o hotelId
+  // stale do client, para nunca duplicar um hotel que já existe.
+  const hoteisAtuais = await buscarHoteisParaMatch(supabase);
+  const hotelIdPorNomeNovo = new Map<string, string>();
+  for (const nomeHotel of new Set(
+    body.reservas.filter((r) => !r.hotelId).map((r) => r.hotelNome)
+  )) {
+    const matchAtual = encontrarMelhorMatch(nomeHotel, hoteisAtuais);
+    if (matchAtual.hotelId) {
+      hotelIdPorNomeNovo.set(nomeHotel, matchAtual.hotelId);
+      continue;
+    }
+    const { hotelId } = await criarHotelComEnriquecimentoTavily(supabase, nomeHotel);
+    hotelIdPorNomeNovo.set(nomeHotel, hotelId);
+    // Hotel recém-criado entra na lista de candidatos imediatamente — se
+    // outro nome novo deste mesmo upload for uma variação de grafia dele
+    // (ex. "Hotel X" e "Hotel X Ltda" na mesma planilha), o segundo reusa
+    // o hotel que o primeiro acabou de criar em vez de criar de novo.
+    hoteisAtuais.push({ id: hotelId, nome: nomeHotel, nomesAlternativos: [] });
+  }
+
+  const reservasComHotelResolvido = body.reservas.map((reserva) => ({
+    ...reserva,
+    hotelId: reserva.hotelId ?? hotelIdPorNomeNovo.get(reserva.hotelNome) ?? null,
+  }));
+
   // Chave de dedupe é (localizador, hotel) — a chave real de consolidação do
   // domínio (Milestone 5), que bate com a constraint unique(hotel_id,
-  // localizador) da tabela. Reserva sem hotel_id resolvido cai no fallback
-  // por nome do hotel, já que não há hotel_id para comparar ainda.
-  const chaveDedupe = (localizador: string, hotelId: string | null, hotelNome: string) =>
-    `${localizador}::${hotelId ?? `nome:${hotelNome}`}`;
+  // localizador) da tabela. Usa sempre o hotel_id já resolvido acima, nunca
+  // o nome do hotel como fallback — evita o descasamento de chave que
+  // causava a falha de dedupe descrita acima.
+  const chaveDedupe = (localizador: string, hotelId: string | null) => `${localizador}::${hotelId ?? "sem-hotel"}`;
 
-  const localizadores = body.reservas.map((reserva) => reserva.localizador);
+  const localizadores = reservasComHotelResolvido.map((reserva) => reserva.localizador);
   const { data: existentes, error: erroConsulta } = await supabase
     .schema("reconfirmacao")
     .from("reservations")
-    .select("localizador, hotel_id, hotels(nome)")
+    .select("localizador, hotel_id")
     .in("localizador", localizadores);
 
   if (erroConsulta) {
@@ -49,14 +84,10 @@ export async function POST(request: NextRequest) {
   }
 
   const jaExistentes = new Set(
-    (existentes ?? []).map((linha) => {
-      const hotelRelacionado = Array.isArray(linha.hotels) ? linha.hotels[0] : linha.hotels;
-      const nomeHotel = (hotelRelacionado as { nome: string } | undefined)?.nome ?? "";
-      return chaveDedupe(linha.localizador, linha.hotel_id, nomeHotel);
-    })
+    (existentes ?? []).map((linha) => chaveDedupe(linha.localizador, linha.hotel_id))
   );
-  const novasReservas = body.reservas.filter(
-    (reserva) => !jaExistentes.has(chaveDedupe(reserva.localizador, reserva.hotelId, reserva.hotelNome))
+  const novasReservas = reservasComHotelResolvido.filter(
+    (reserva) => !jaExistentes.has(chaveDedupe(reserva.localizador, reserva.hotelId))
   );
 
   if (novasReservas.length === 0) {
@@ -68,21 +99,10 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  // Hotel sem match no banco (Milestone 5) é criado agora, já enriquecido via
-  // Tavily numa única chamada por nome de hotel — mesmo hotel referenciado em
-  // várias reservas do mesmo upload gera só 1 chamada (PRD §4.2, item 2).
-  const hotelIdPorNomeNovo = new Map<string, string>();
-  for (const nomeHotel of new Set(
-    novasReservas.filter((r) => !r.hotelId).map((r) => r.hotelNome)
-  )) {
-    const { hotelId } = await criarHotelComEnriquecimentoTavily(supabase, nomeHotel);
-    hotelIdPorNomeNovo.set(nomeHotel, hotelId);
-  }
-
   const linhasParaInserir = novasReservas.map((reserva) => ({
     localizador: reserva.localizador,
     localizador_externo: reserva.localizadorExterno,
-    hotel_id: reserva.hotelId ?? hotelIdPorNomeNovo.get(reserva.hotelNome) ?? null,
+    hotel_id: reserva.hotelId,
     fornecedor: reserva.fornecedor,
     data_checkin: reserva.dataCheckin,
     data_checkout: reserva.dataCheckout,
@@ -105,17 +125,17 @@ export async function POST(request: NextRequest) {
 
   // Envio real de e-mail de reconfirmação (Milestone 7) — 1 e-mail por
   // reserva consolidada (localizador+hotel), nunca reenvio silencioso: a
-  // dedupe já aconteceu acima por (localizador, hotel), então toda reserva
-  // recém-inserida aqui é de fato nova e deve ser enviada agora.
+  // dedupe já aconteceu acima por (localizador, hotel_id já resolvido),
+  // então toda reserva recém-inserida aqui é de fato nova e deve ser
+  // enviada agora.
   const relatorioEnvios: ResultadoEnvioRelatorio[] = [];
   let enviadas = 0;
   let semHotelOuEmail = 0;
   let comErroDeEnvio = 0;
 
   for (const [indice, inserida] of (inseridas ?? []).entries()) {
-    // Índice posicional, não busca por hotelId: hotel recém-criado via
-    // Tavily muda o hotel_id da linha inserida em relação à reserva original
-    // (que ainda tinha hotelId null antes da criação acima).
+    // Índice posicional: novasReservas já tem hotelId resolvido (igual ao
+    // hotel_id gravado), insert() preserva a ordem do array enviado.
     const reservaOriginal = novasReservas[indice];
     if (!reservaOriginal) continue;
 
