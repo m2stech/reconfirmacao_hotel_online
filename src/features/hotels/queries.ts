@@ -145,6 +145,33 @@ export async function marcarEmailObsoleto(supabase: TypedClient, emailId: string
 }
 
 /**
+ * Confirma um e-mail "sugerido" (manual ou Tavily, Milestone 8) após revisão
+ * humana — a partir daqui ele passa a ser elegível para envio automático
+ * (ver filtro `confiabilidade === 'confirmado'` em confirm/route.ts). Também
+ * marca o hotel como tendo contato confirmado, já que ele passa a ter pelo
+ * menos 1 e-mail revisado por humano.
+ */
+export async function confirmarEmailHotel(supabase: TypedClient, hotelId: string, emailId: string, userId: string) {
+  const { error: erroEmail } = await supabase
+    .schema("reconfirmacao")
+    .from("hotel_emails")
+    .update({ confiabilidade: "confirmado" })
+    .eq("id", emailId);
+  if (erroEmail) throw erroEmail;
+
+  const { error: erroHotel } = await supabase
+    .schema("reconfirmacao")
+    .from("hotels")
+    .update({
+      confiabilidade_contato: "confirmado",
+      ultima_confirmacao_em: new Date().toISOString(),
+      ultima_confirmacao_por: userId,
+    })
+    .eq("id", hotelId);
+  if (erroHotel) throw erroHotel;
+}
+
+/**
  * Mescla `hotelDuplicadoId` em `hotelPrincipalId`: reatribui e-mails e
  * reservas para o principal, acrescenta o nome do duplicado como nome
  * alternativo (preserva o matching fuzzy de futuras importações) e remove o

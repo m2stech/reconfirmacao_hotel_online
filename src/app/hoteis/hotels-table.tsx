@@ -109,35 +109,42 @@ export function HotelsTable() {
       ) : null}
 
       <div className="overflow-x-auto rounded-[15px] border border-border">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
+              <TableHead className="w-56">Nome</TableHead>
               <TableHead>E-mail(s)</TableHead>
-              <TableHead>País</TableHead>
-              <TableHead>Idioma</TableHead>
-              <TableHead>Confiabilidade</TableHead>
-              <TableHead>Última confirmação</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="w-36">País</TableHead>
+              <TableHead className="w-32">Última confirmação</TableHead>
+              <TableHead className="sticky right-0 w-44 bg-background text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
+                Ações
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {carregando ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : hoteis.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Nenhum hotel encontrado.
                 </TableCell>
               </TableRow>
             ) : (
               hoteis.map((hotel) => (
                 <TableRow key={hotel.id}>
-                  <TableCell className="font-medium">{hotel.nome}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="truncate" title={hotel.nome}>
+                      {hotel.nome}
+                    </div>
+                    <Badge variant={CONFIABILIDADE_BADGE[hotel.confiabilidade_contato] ?? "outline"} className="mt-1 text-[10px]">
+                      {CONFIABILIDADE_LABEL[hotel.confiabilidade_contato] ?? hotel.confiabilidade_contato}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     {hotel.hotel_emails.length === 0 ? (
                       <span className="text-sm text-muted-foreground">—</span>
@@ -146,17 +153,18 @@ export function HotelsTable() {
                         {hotel.hotel_emails.map((hotelEmail) => (
                           <div key={hotelEmail.id} className="flex items-center gap-2 text-sm">
                             <span
-                              className={
+                              className={`truncate ${
                                 hotelEmail.confiabilidade === "obsoleto"
                                   ? "text-muted-foreground line-through"
                                   : ""
-                              }
+                              }`}
+                              title={hotelEmail.email}
                             >
                               {hotelEmail.email}
                             </span>
                             <Badge
                               variant={CONFIABILIDADE_BADGE[hotelEmail.confiabilidade] ?? "outline"}
-                              className="text-[10px]"
+                              className="shrink-0 text-[10px]"
                             >
                               {CONFIABILIDADE_LABEL[hotelEmail.confiabilidade] ?? hotelEmail.confiabilidade}
                             </Badge>
@@ -166,25 +174,21 @@ export function HotelsTable() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {hotel.pais ?? "—"}
+                    <div className="truncate" title={hotel.pais ?? undefined}>
+                      {hotel.pais ?? "—"}
+                    </div>
                     {hotel.pais_a_confirmar ? (
-                      <Badge variant="secondary" className="ml-2 text-[10px]">
+                      <Badge variant="secondary" className="mt-1 text-[10px]">
                         A confirmar
                       </Badge>
                     ) : null}
-                  </TableCell>
-                  <TableCell>{hotel.idioma ?? "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={CONFIABILIDADE_BADGE[hotel.confiabilidade_contato] ?? "outline"}>
-                      {CONFIABILIDADE_LABEL[hotel.confiabilidade_contato] ?? hotel.confiabilidade_contato}
-                    </Badge>
                   </TableCell>
                   <TableCell>
                     {hotel.ultima_confirmacao_em
                       ? new Date(hotel.ultima_confirmacao_em).toLocaleDateString("pt-BR")
                       : "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="sticky right-0 bg-background text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.1)]">
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => setHotelEmEdicao(hotel)}>
                         Editar
