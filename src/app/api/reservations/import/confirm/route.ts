@@ -1,10 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
+import { enviarReconfirmacaoInicial } from "@/features/email-sends/send";
 
 type ConfirmarImportacaoBody = {
   arquivoNome: string;
   reservas: ReservaConsolidadaComHotel[];
+};
+
+type ResultadoEnvioRelatorio = {
+  localizador: string;
+  hotelNome: string;
+  sucesso: boolean;
+  motivo?: string;
 };
 
 export async function POST(request: NextRequest) {
@@ -77,15 +85,98 @@ export async function POST(request: NextRequest) {
     .schema("reconfirmacao")
     .from("reservations")
     .insert(linhasParaInserir)
-    .select("id");
+    .select("id, localizador, hotel_id");
 
   if (erroInsercao) {
     return NextResponse.json({ ok: false, erro: "Falha ao gravar reservas." }, { status: 500 });
+  }
+
+  // Envio real de e-mail de reconfirmação (Milestone 7) — 1 e-mail por
+  // reserva consolidada (localizador+hotel), nunca reenvio silencioso: a
+  // dedupe já aconteceu acima por (localizador, hotel), então toda reserva
+  // recém-inserida aqui é de fato nova e deve ser enviada agora.
+  const relatorioEnvios: ResultadoEnvioRelatorio[] = [];
+  let enviadas = 0;
+  let semHotelOuEmail = 0;
+  let comErroDeEnvio = 0;
+
+  for (const inserida of inseridas ?? []) {
+    const reservaOriginal = novasReservas.find(
+      (r) => r.localizador === inserida.localizador && r.hotelId === inserida.hotel_id
+    );
+    if (!reservaOriginal) continue;
+
+    if (!inserida.hotel_id) {
+      semHotelOuEmail += 1;
+      relatorioEnvios.push({
+        localizador: inserida.localizador,
+        hotelNome: reservaOriginal.hotelNome,
+        sucesso: false,
+        motivo: "Hotel não cadastrado no banco de contatos — reserva gravada, e-mail não enviado.",
+      });
+      continue;
+    }
+
+    const { data: hotel, error: erroHotel } = await supabase
+      .schema("reconfirmacao")
+      .from("hotels")
+      .select("nome, pais, hotel_emails(email, confiabilidade)")
+      .eq("id", inserida.hotel_id)
+      .single();
+
+    const emailHotel = (hotel?.hotel_emails ?? []).find((e) => e.confiabilidade !== "obsoleto");
+
+    if (erroHotel || !hotel || !emailHotel) {
+      semHotelOuEmail += 1;
+      relatorioEnvios.push({
+        localizador: inserida.localizador,
+        hotelNome: reservaOriginal.hotelNome,
+        sucesso: false,
+        motivo: "Hotel sem e-mail de contato cadastrado — reserva gravada, e-mail não enviado.",
+      });
+      continue;
+    }
+
+    const resultado = await enviarReconfirmacaoInicial(
+      supabase,
+      {
+        id: inserida.id,
+        localizador: reservaOriginal.localizador,
+        localizadorExterno: reservaOriginal.localizadorExterno,
+        dataCheckin: reservaOriginal.dataCheckin,
+        dataCheckout: reservaOriginal.dataCheckout,
+        tipoHabitacao: reservaOriginal.tipoHabitacao,
+        regimeAlimentar: reservaOriginal.regimeAlimentar,
+        fornecedor: reservaOriginal.fornecedor,
+        hospedes: reservaOriginal.hospedes,
+        hotelNome: hotel.nome,
+        hotelPais: hotel.pais,
+        destinatario: emailHotel.email,
+      },
+      user.id
+    );
+
+    if (resultado.sucesso) {
+      enviadas += 1;
+      relatorioEnvios.push({ localizador: inserida.localizador, hotelNome: hotel.nome, sucesso: true });
+    } else {
+      comErroDeEnvio += 1;
+      relatorioEnvios.push({
+        localizador: inserida.localizador,
+        hotelNome: hotel.nome,
+        sucesso: false,
+        motivo: resultado.erro,
+      });
+    }
   }
 
   return NextResponse.json({
     ok: true,
     importadas: inseridas?.length ?? 0,
     puladas: body.reservas.length - novasReservas.length,
+    enviadas,
+    semHotelOuEmail,
+    comErroDeEnvio,
+    relatorioEnvios,
   });
 }
