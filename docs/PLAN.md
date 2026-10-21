@@ -259,16 +259,27 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Portar o motor de interpretação de respostas de hotel — a peça mais sofisticada do sistema de referência — preservando ao máximo o comportamento já calibrado em produção (`respostas.py`).
 
 **Entregas:**
-- [ ] Client OpenAI (`src/lib/openai/`) com o mesmo JSON Schema estrito do `respostas.py` (campos: reserva confirmada, regime alimentar confirmado, número de confirmação do hotel, múltiplas confirmações por hóspede, status de pagamento, divergências, pendências, resumo, confiança)
-- [ ] Prompt portado quase 1:1 da versão de referência, sem reescrita — mudanças de prompt ficam para depois, com suíte de regressão (ver abaixo)
-- [ ] Fallback regex para respostas em formato estruturado e para extração de número quando a IA não captura (portado de `respostas.py`)
-- [ ] Filtro de mensagens automáticas (out-of-office, bounce) antes de gastar chamada de IA
-- [ ] Acúmulo de estado ao longo de tréplicas (confirmação de mensagem anterior não "some" se a tréplica só falar de outro assunto)
-- [ ] Lógica de status de auditoria (`determinar_status_auditoria` e equivalentes) portada com os mesmos critérios de negócio (CONFIRMADA exige regime alimentar confirmado, etc.)
-- [ ] Registro de custo de tokens (input/output/USD) por chamada, alimentando a tela de custos do Milestone 6
-- [ ] Suíte de regressão com corpos de e-mail anonimizados/sintéticos como fixtures (PRD §7.2) — base de comparação antes de qualquer ajuste futuro de prompt
-- [ ] Testes de unidade da lógica de regras de negócio com saída da IA mockada (sem chamar a API em teste de unidade)
-- [ ] Agente `ai-prompt-guard` executado para confirmar que nenhuma chave/prompt vaza para o client
+- [x] Client OpenAI (`src/lib/openai/`) com o mesmo JSON Schema estrito do `respostas.py` (campos: reserva confirmada, regime alimentar confirmado, número de confirmação do hotel, múltiplas confirmações por hóspede, status de pagamento, divergências, pendências, resumo, confiança)
+- [x] Prompt portado quase 1:1 da versão de referência, sem reescrita — mudanças de prompt ficam para depois, com suíte de regressão (ver abaixo)
+- [x] Fallback regex para respostas em formato estruturado e para extração de número quando a IA não captura (portado de `respostas.py`)
+- [x] Filtro de mensagens automáticas (out-of-office, bounce) antes de gastar chamada de IA
+- [x] Acúmulo de estado ao longo de tréplicas (confirmação de mensagem anterior não "some" se a tréplica só falar de outro assunto)
+- [x] Lógica de status de auditoria (`determinar_status_auditoria` e equivalentes) portada com os mesmos critérios de negócio (CONFIRMADA exige regime alimentar confirmado, etc.)
+- [x] Registro de custo de tokens (input/output/USD) por chamada, alimentando a tela de custos do Milestone 6
+- [x] Suíte de regressão com corpos de e-mail anonimizados/sintéticos como fixtures (PRD §7.2) — base de comparação antes de qualquer ajuste futuro de prompt
+- [x] Testes de unidade da lógica de regras de negócio com saída da IA mockada (sem chamar a API em teste de unidade)
+- [x] Agente `ai-prompt-guard` executado para confirmar que nenhuma chave/prompt vaza para o client
+
+**Decisões de modelagem desta sessão:**
+- `reserva_confirmada`/`regime_alimentar_confirmado` são enum `SIM`/`NAO`/`INDEFINIDO` no domínio da IA (igual ao `respostas.py`), mas `boolean | null` em `reconfirmacao.hotel_replies` (schema do Milestone 2). Conversão isolada em `src/features/hotel-replies/mapping.ts` (`INDEFINIDO` ↔ `null`) — "não sabemos" nunca é tratado como "não confirmado".
+- Chamada à OpenAI via `fetch` direto (Chat Completions API, `response_format: json_schema`), sem instalar o SDK `openai` — mesmo padrão minimalista já usado para Tavily/Graph no projeto, sem dependência nova.
+- Lógica portada em módulos pequenos e testáveis isoladamente (`automatic-message`, `regex-fallback`, `postprocess`, `status`, `conversation-state`), em vez de um único arquivo monolítico como o `respostas.py` original — cada regra de negócio (filtro automático, fallback regex, correção de divergência de identificador, mapeamento de confirmação múltipla, status) tem sua própria suíte de teste.
+- `interpret.ts` orquestra a ordem automática → regex → IA e todo o pós-processamento, mas **não lê nem escreve no Graph/Supabase diretamente** — recebe a mensagem já lida e devolve a interpretação pronta para persistir (`persist.ts`). A leitura periódica via Graph (`buscar_mensagens` do sistema de referência) e o loop de processamento em lote ficam para o Milestone 10 (jobs assíncronos) — este milestone entrega o motor de interpretação em si, não o polling.
+- `correspondencia_reserva` (CONFIRMADA/PROVAVEL/DIVERGENTE/NAO_VERIFICAVEL) não é persistido como coluna própria em `hotel_replies` (schema do Milestone 2 não previu esse campo) — por ora fica só na interpretação em memória de cada resposta individual; o acúmulo ao longo da conversa (`mesclarEstadoAcumulado`) mantém esse campo com valor neutro (`NAO_VERIFICAVEL`) até que uma migration do Milestone 10 adicione a coluna, se necessário para a view de auditoria completa.
+
+**Bug real encontrado nos próprios testes (preservado, não "corrigido" — fidelidade ao sistema de referência):** a regex de `_corrigir_divergencia_de_identificadores` (`respostas.py`) produz pontuação duplicada (`"frase.."`) quando o resumo já termina em ponto antes do trecho substituído — reproduzido também no Python original rodando a mesma regex. Portado 1:1 de propósito (CLAUDE.md: não reescrever lógica já calibrada em produção nesta etapa); documentado no teste correspondente (`postprocess.test.ts`) em vez de silenciosamente alterado.
+
+**Auditoria `ai-prompt-guard`:** confirmou que a única leitura de `OPENAI_API_KEY` e a única chamada à API estão em `src/lib/openai/client.ts` (já com `server-only`), que nenhum componente `"use client"` importa esse código (feature ainda não está exposta em nenhuma rota/UI neste milestone) e que `validarInterpretacao` é sempre o único caminho de retorno antes de qualquer persistência. Encontrou e corrigiu uma lacuna real: faltava `import "server-only"` em `src/features/hotel-replies/interpret.ts` (o orquestrador que dispara a chamada de IA, análogo a `features/hotels/enrich.ts` no Milestone 8) — corrigido.
 
 **Commit final:** `feat: interpretação de respostas de hotel via OpenAI com fallback regex`
 
