@@ -50,6 +50,7 @@ type Envio = {
   destinatario: string;
   assunto: string;
   created_at: string;
+  erro_detalhe?: string | null;
   hotel_replies: { recebido_em: string; resumo: string | null; corpo_texto: string }[];
 };
 
@@ -72,26 +73,81 @@ export function ReservationDetailDialog({
   const [pagamentoManual, setPagamentoManual] = useState("");
   const [tipoPendenciaManual, setTipoPendenciaManual] = useState("");
 
-  useEffect(() => {
-    async function carregar() {
-      setCarregando(true);
-      const resposta = await fetch(`/api/audit/${reservationId}`);
-      const dados = await resposta.json();
-      if (!dados.ok) {
-        toast.error(dados.erro ?? "Falha ao carregar reserva.");
-        setCarregando(false);
-        return;
-      }
-      setReserva(dados.reserva);
-      setEnvios(dados.envios);
-      setStatusManual(dados.reserva.status_manual ?? "nenhum");
-      setRegimeConfirmado(Boolean(dados.reserva.regime_alimentar_confirmado_manual));
-      setPagamentoManual(dados.reserva.pagamento_manual ?? "");
-      setTipoPendenciaManual(dados.reserva.tipo_pendencia_manual ?? "");
-      setCarregando(false);
+  const [editandoReenvioId, setEditandoReenvioId] = useState<string | null>(null);
+  const [destinatarioReenvio, setDestinatarioReenvio] = useState("");
+  const [assuntoReenvio, setAssuntoReenvio] = useState("");
+  const [reenviando, setReenviando] = useState(false);
+
+  const [respondendoId, setRespondendoId] = useState<string | null>(null);
+  const [textoResposta, setTextoResposta] = useState("");
+  const [enviandoResposta, setEnviandoResposta] = useState(false);
+
+  async function carregarDetalhe() {
+    const resposta = await fetch(`/api/audit/${reservationId}`);
+    const dados = await resposta.json();
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao carregar reserva.");
+      return;
     }
-    carregar();
+    setReserva(dados.reserva);
+    setEnvios(dados.envios);
+    setStatusManual(dados.reserva.status_manual ?? "nenhum");
+    setRegimeConfirmado(Boolean(dados.reserva.regime_alimentar_confirmado_manual));
+    setPagamentoManual(dados.reserva.pagamento_manual ?? "");
+    setTipoPendenciaManual(dados.reserva.tipo_pendencia_manual ?? "");
+  }
+
+  useEffect(() => {
+    (async () => {
+      setCarregando(true);
+      await carregarDetalhe();
+      setCarregando(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservationId]);
+
+  async function reenviar(envioId: string) {
+    setReenviando(true);
+    const resposta = await fetch(`/api/email-sends/${envioId}/reenviar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destinatario: destinatarioReenvio, assunto: assuntoReenvio }),
+    });
+    const dados = await resposta.json();
+    setReenviando(false);
+
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao reenviar e-mail.");
+      return;
+    }
+    toast.success("E-mail reenviado.");
+    setEditandoReenvioId(null);
+    await carregarDetalhe();
+  }
+
+  async function responder(envioId: string) {
+    if (!textoResposta.trim()) {
+      toast.error("Digite o texto da resposta.");
+      return;
+    }
+    setEnviandoResposta(true);
+    const resposta = await fetch(`/api/email-sends/${envioId}/responder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ textoUsuario: textoResposta }),
+    });
+    const dados = await resposta.json();
+    setEnviandoResposta(false);
+
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao enviar resposta.");
+      return;
+    }
+    toast.success("Resposta enviada ao hotel.");
+    setRespondendoId(null);
+    setTextoResposta("");
+    await carregarDetalhe();
+  }
 
   async function salvar() {
     const statusParaValidar = statusManual === "nenhum" ? null : (statusManual as StatusAuditoria);
@@ -180,6 +236,9 @@ export function ReservationDetailDialog({
                       <p className="text-xs text-muted-foreground">
                         Enviado em {new Date(envio.created_at).toLocaleString("pt-BR")} para {envio.destinatario}
                       </p>
+                      {envio.status === "erro" ? (
+                        <p className="mt-1 text-xs text-destructive">{envio.erro_detalhe}</p>
+                      ) : null}
                       {envio.hotel_replies.map((resposta, indice) => (
                         <div key={indice} className="mt-1 rounded bg-muted/50 p-2 text-xs">
                           <p className="font-medium">
@@ -188,6 +247,74 @@ export function ReservationDetailDialog({
                           <p>{resposta.resumo ?? resposta.corpo_texto}</p>
                         </div>
                       ))}
+
+                      <div className="mt-2 flex gap-2">
+                        {envio.status === "erro" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditandoReenvioId(editandoReenvioId === envio.id ? null : envio.id);
+                              setDestinatarioReenvio(envio.destinatario);
+                              setAssuntoReenvio(envio.assunto);
+                            }}
+                          >
+                            {editandoReenvioId === envio.id ? "Cancelar" : "Reenviar"}
+                          </Button>
+                        ) : null}
+                        {envio.status === "enviado" ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setRespondendoId(respondendoId === envio.id ? null : envio.id);
+                              setTextoResposta("");
+                            }}
+                          >
+                            {respondendoId === envio.id ? "Cancelar" : "Responder"}
+                          </Button>
+                        ) : null}
+                      </div>
+
+                      {editandoReenvioId === envio.id ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <div className="flex flex-col gap-1">
+                            <Label>Destinatário</Label>
+                            <Input
+                              value={destinatarioReenvio}
+                              onChange={(event) => setDestinatarioReenvio(event.target.value)}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Label>Assunto</Label>
+                            <Input
+                              value={assuntoReenvio}
+                              onChange={(event) => setAssuntoReenvio(event.target.value)}
+                            />
+                          </div>
+                          <Button size="sm" disabled={reenviando} onClick={() => reenviar(envio.id)}>
+                            {reenviando ? "Reenviando..." : "Confirmar reenvio"}
+                          </Button>
+                        </div>
+                      ) : null}
+
+                      {respondendoId === envio.id ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <textarea
+                            className="min-h-20 rounded-md border border-border bg-background p-2 text-sm"
+                            placeholder="Escreva a resposta ao hotel..."
+                            value={textoResposta}
+                            onChange={(event) => setTextoResposta(event.target.value)}
+                          />
+                          <Button
+                            size="sm"
+                            disabled={enviandoResposta}
+                            onClick={() => responder(envio.id)}
+                          >
+                            {enviandoResposta ? "Enviando..." : "Enviar resposta"}
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
