@@ -188,14 +188,24 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Primeira integração externa real — troca o botão "Confirmar importação" (que hoje só grava no banco) por envio de e-mail de verdade via Graph, com todas as salvaguardas de ambiente de teste do PRD §7.
 
 **Entregas:**
-- [ ] Client Microsoft Graph (`src/lib/graph/`) com client credentials flow (app registration, client ID/secret/tenant ID do `.env`)
-- [ ] Montagem de e-mail HTML multilíngue (PT/ES/EN por país do hóspede), portado do `enviar_email.py` de referência — 1 e-mail por `Localizador`, consolidando todos os hóspedes
-- [ ] Envio real via Graph, registrando `graph_message_id`/`conversation_id`/`internet_message_id` em `email_sends`
-- [ ] Deduplicação real (bloqueante, não só visual): localizador já enviado é ignorado no envio e reportado ao consultor — nunca reenvia silenciosamente (PRD §4.2, item 4)
-- [ ] Resposta ao hotel pela interface (reply preservando thread via `createReply` → `patch` → `send`, portado de `enviar_email.py`)
-- [ ] Reenvio de e-mail com erro, com edição de destinatário/assunto antes de reenviar
-- [ ] Toda chamada de teste usa a conta de teste do `.env` (`MS_GRAPH_AUTHORIZED_EMAIL`), nunca a caixa de produção nem e-mail real de hotel (PRD §7.1)
-- [ ] Mock da camada Graph em testes automatizados (nenhum teste de unidade/CI chama a API real)
+- [x] Client Microsoft Graph (`src/lib/graph/`) com client credentials flow (app registration, client ID/secret/tenant ID do `.env`)
+- [x] Montagem de e-mail HTML multilíngue (PT/ES/EN por país do hóspede), portado do `enviar_email.py` de referência — 1 e-mail por `Localizador`, consolidando todos os hóspedes
+- [x] Envio real via Graph, registrando `graph_message_id`/`conversation_id`/`internet_message_id` em `email_sends`
+- [x] Deduplicação real (bloqueante, não só visual): localizador já enviado é ignorado no envio e reportado ao consultor — nunca reenvia silenciosamente (PRD §4.2, item 4)
+- [x] Resposta ao hotel pela interface (reply preservando thread via `createReply` → `patch` → `send`, portado de `enviar_email.py`)
+- [x] Reenvio de e-mail com erro, com edição de destinatário/assunto antes de reenviar
+- [x] Toda chamada de teste usa a conta de teste do `.env` (`MS_GRAPH_AUTHORIZED_EMAIL`), nunca a caixa de produção nem e-mail real de hotel (PRD §7.1)
+- [x] Mock da camada Graph em testes automatizados (nenhum teste de unidade/CI chama a API real)
+
+**Decisão de modelagem desta sessão:** como 1 e-mail consolida todos os hóspedes de um localizador+hotel (não mais 1 por linha/hóspede), não há mais "o" hóspede individual para decidir o idioma do e-mail. O idioma passa a ser derivado do país do **hotel** (`reconfirmacao.hotels.pais`), que já é o campo correto para isso no schema (PRD §4.2.1) — não do país do hóspede como no `enviar_email.py` original.
+
+**Descoberta de comportamento real do Graph (confirmada em teste de integração manual):** o `id` de mensagem retornado por `GET /messages/{id}` logo após o envio às vezes não é aceito por `createReply` (404 `ErrorItemNotFound`) — é uma cópia em trânsito, não a mensagem final em Sent Items. `reply.ts` já trazia (portado de `enviar_email.py`) um fallback que busca o id atual via `$filter=internetMessageId eq '...'` quando o id original falha; esse fallback foi validado como a correção real do problema, não um workaround.
+
+**Permissões de aplicação necessárias no app registration:** além de `Mail.Read`/`Mail.Send` (citados no CLAUDE.md), o fluxo de envio/reenvio/resposta depende de `Mail.ReadWrite` (criação/edição de rascunho via `POST /messages`, `PATCH`, `createReply`) — descoberto ao testar contra um app registration que só tinha Read/Send e recebia 403 `ErrorAccessDenied` em qualquer criação de rascunho. As três permissões de aplicação, com admin consent, são pré-requisito antes de repetir os testes de integração contra o app registration de produção (BV Group) no Milestone 13.
+
+**Gap de UI corrigido nesta sessão:** as rotas de reenvio e resposta (`/api/email-sends/[id]/reenviar`, `/api/email-sends/[id]/responder`) foram implementadas primeiro só como API; o PLAN pede explicitamente que isso aconteça "pela interface" e "com edição de destinatário/assunto antes de reenviar". Corrigido no modal de detalhe da reserva (dashboard, Milestone 4): botão "Reenviar" (em envio com status erro) abre formulário editável de destinatário/assunto antes de confirmar; botão "Responder" (em envio com status enviado) abre textarea para resposta manual preservando thread.
+
+**Teste de integração manual (contra tenant de teste próprio, `mauricio@m2stech.tur.br`, nunca produção/hotel real — PRD §7.1):** confirmado `Mail.Read`, `Mail.Send` e `Mail.ReadWrite` (aplicação, admin consent) funcionais; envio inicial com captura de `graph_message_id`/`conversation_id`/`internet_message_id`; resposta preservando thread com o fallback por `internetMessageId` acionado e validado; fluxo completo hotel+reserva sintéticos → `enviarReconfirmacaoInicial` → e-mail real enviado → `email_sends` gravado corretamente → limpeza automática dos dados de teste ao final. Credenciais de produção (BV Group) ainda pendentes — troca de ambiente fica para o checklist do Milestone 13.
 
 **Commit final:** `feat: envio e resposta de e-mail via Microsoft Graph (client credentials)`
 
