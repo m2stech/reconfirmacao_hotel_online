@@ -216,7 +216,9 @@ export function ImportForm() {
                     <TableCell className="truncate" title={reserva.hotelNome}>
                       {reserva.hotelNome}
                       {!reserva.hotelId ? (
-                        <span className="ml-1 text-xs text-muted-foreground">(hotel não cadastrado)</span>
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          (hotel novo — e-mail/país serão buscados automaticamente ao confirmar)
+                        </span>
                       ) : null}
                     </TableCell>
                     <TableCell>{reserva.dataCheckin ?? "—"}</TableCell>
