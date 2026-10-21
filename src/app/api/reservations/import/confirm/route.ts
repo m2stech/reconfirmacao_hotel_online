@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
 import { enviarReconfirmacaoInicial } from "@/features/email-sends/send";
+import { criarHotelComEnriquecimentoTavily } from "@/features/hotels/enrich";
 
 type ConfirmarImportacaoBody = {
   arquivoNome: string;
@@ -67,10 +68,21 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  // Hotel sem match no banco (Milestone 5) é criado agora, já enriquecido via
+  // Tavily numa única chamada por nome de hotel — mesmo hotel referenciado em
+  // várias reservas do mesmo upload gera só 1 chamada (PRD §4.2, item 2).
+  const hotelIdPorNomeNovo = new Map<string, string>();
+  for (const nomeHotel of new Set(
+    novasReservas.filter((r) => !r.hotelId).map((r) => r.hotelNome)
+  )) {
+    const { hotelId } = await criarHotelComEnriquecimentoTavily(supabase, nomeHotel);
+    hotelIdPorNomeNovo.set(nomeHotel, hotelId);
+  }
+
   const linhasParaInserir = novasReservas.map((reserva) => ({
     localizador: reserva.localizador,
     localizador_externo: reserva.localizadorExterno,
-    hotel_id: reserva.hotelId,
+    hotel_id: reserva.hotelId ?? hotelIdPorNomeNovo.get(reserva.hotelNome) ?? null,
     fornecedor: reserva.fornecedor,
     data_checkin: reserva.dataCheckin,
     data_checkout: reserva.dataCheckout,
@@ -100,10 +112,11 @@ export async function POST(request: NextRequest) {
   let semHotelOuEmail = 0;
   let comErroDeEnvio = 0;
 
-  for (const inserida of inseridas ?? []) {
-    const reservaOriginal = novasReservas.find(
-      (r) => r.localizador === inserida.localizador && r.hotelId === inserida.hotel_id
-    );
+  for (const [indice, inserida] of (inseridas ?? []).entries()) {
+    // Índice posicional, não busca por hotelId: hotel recém-criado via
+    // Tavily muda o hotel_id da linha inserida em relação à reserva original
+    // (que ainda tinha hotelId null antes da criação acima).
+    const reservaOriginal = novasReservas[indice];
     if (!reservaOriginal) continue;
 
     if (!inserida.hotel_id) {
@@ -124,7 +137,10 @@ export async function POST(request: NextRequest) {
       .eq("id", inserida.hotel_id)
       .single();
 
-    const emailHotel = (hotel?.hotel_emails ?? []).find((e) => e.confiabilidade !== "obsoleto");
+    // Só usa e-mail já confirmado por humano para envio automático — e-mail
+    // "sugerido" (descoberto por Tavily, Milestone 8) exige confirmação
+    // manual em /hoteis antes do primeiro uso (PRD §4.2, item 2).
+    const emailHotel = (hotel?.hotel_emails ?? []).find((e) => e.confiabilidade === "confirmado");
 
     if (erroHotel || !hotel || !emailHotel) {
       semHotelOuEmail += 1;
@@ -132,7 +148,7 @@ export async function POST(request: NextRequest) {
         localizador: inserida.localizador,
         hotelNome: reservaOriginal.hotelNome,
         sucesso: false,
-        motivo: "Hotel sem e-mail de contato cadastrado — reserva gravada, e-mail não enviado.",
+        motivo: "Hotel sem e-mail de contato confirmado — reserva gravada, e-mail não enviado (confirme o contato em /hoteis).",
       });
       continue;
     }

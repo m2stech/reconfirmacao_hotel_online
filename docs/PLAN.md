@@ -218,12 +218,25 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Substituir a entrada manual de e-mail/país de hotel (Milestone 5) pela automação via Tavily — elimina de vez o passo manual de colar o xlsx numa LLM de chat externa.
 
 **Entregas:**
-- [ ] Client Tavily (`src/lib/tavily/`), lendo `TAVILY_API_KEY` do `.env`
-- [ ] Busca combinada e-mail + país numa única chamada por hotel novo/desconhecido (PRD §4.2, item 2 — não duas chamadas separadas)
-- [ ] Resultado entra como "sugestão não confirmada" no banco de contatos — e-mail exige confirmação humana antes do primeiro uso; país pode ser aceito automaticamente com flag "a confirmar"
-- [ ] Matching fuzzy de nome de hotel (grafia/acentuação/sufixos) com confirmação humana quando a confiança for baixa — evita duplicar hotel ou atribuir reserva ao hotel errado
-- [ ] Registro de provedor de busca e nível de confiança por campo (e-mail, país)
-- [ ] Testes de unidade da lógica de matching com resposta do Tavily mockada (nunca chamando a API real em teste de unidade — PRD §7.3)
+- [x] Client Tavily (`src/lib/tavily/`), lendo `TAVILY_API_KEY` do `.env`
+- [x] Busca combinada e-mail + país numa única chamada por hotel novo/desconhecido (PRD §4.2, item 2 — não duas chamadas separadas)
+- [x] Resultado entra como "sugestão não confirmada" no banco de contatos — e-mail exige confirmação humana antes do primeiro uso; país pode ser aceito automaticamente com flag "a confirmar"
+- [x] Matching fuzzy de nome de hotel (grafia/acentuação/sufixos) com confirmação humana quando a confiança for baixa — evita duplicar hotel ou atribuir reserva ao hotel errado (reusa `encontrarMelhorMatch` do Milestone 5, sem mudança)
+- [x] Registro de provedor de busca e nível de confiança por campo (e-mail, país) — reusa os enums `contact_source`/`contact_reliability` já criados no Milestone 2 (`hotels.pais_fonte`, `hotel_emails.fonte`/`confiabilidade`), sem migration nova
+- [x] Testes de unidade da lógica de matching com resposta do Tavily mockada (nunca chamando a API real em teste de unidade — PRD §7.3)
+
+**Descoberta ao inspecionar o schema (nenhuma migration nova precisou):** o Milestone 2 já tinha modelado tudo que o Milestone 8 precisava — `contact_source` já incluía o valor `'tavily'`, e `hotels`/`hotel_emails` já tinham `pais_fonte`/`pais_a_confirmar`/`fonte`/`confiabilidade`. O enum categórico (`confirmado`/`sugerido`/`obsoleto`) já cobre o "nível de confiança por campo" pedido pelo PRD — decisão desta sessão: não adicionar um score numérico 0-1 à parte (como existe em `hotel_replies.confianca` para a IA), por não ter consumidor na UI e o enum já ser a granularidade usada em toda a tela `/hoteis`.
+
+**Lacuna de segurança corrigida nesta sessão (fora do escopo original do milestone, mas bloqueante para a regra "confirmação humana antes do primeiro uso"):** `src/app/api/reservations/import/confirm/route.ts` aceitava qualquer e-mail com `confiabilidade !== 'obsoleto'` para envio automático — isso incluía e-mail `'sugerido'` (manual ou Tavily), violando a regra do PRD §4.2 item 2 desde antes deste milestone existir. Corrigido para exigir `confiabilidade === 'confirmado'`.
+
+**Onde a busca Tavily é acionada:** no momento de *confirmar* a importação (não no preview), para cada hotel sem match no banco (`hotelId === null` após matching fuzzy) — 1 chamada por nome de hotel novo distinto no upload, mesmo que várias reservas do mesmo upload referenciem o mesmo hotel novo (`criarHotelComEnriquecimentoTavily`, acionada de `confirm/route.ts`). Decisão: não acionar no preview para não gastar crédito/criar hotel se o consultor cancelar a importação depois de ver o preview.
+
+**Problemas reais descobertos em teste de integração manual (chamadas reais à API Tavily, PRD §7.3 — nunca em teste de unidade) e corrigidos nesta sessão:**
+- Query inicial (`"...country/city of X hotel"`) fazia a heurística de país confundir cidade com país (ex.: capturou "Lisbon" em vez de "Portugal" para o Hilton Lisbon real). Corrigido ajustando a query para `"...country (not city) of X hotel"` e reforçando `extrairPais` para priorizar o padrão explícito `"country of/is X"` sobre o genérico `"located in/in X"`.
+- Hotel **inexistente/sintético** (usado para não gastar crédito com hotel real em teste) expôs um falso-positivo grave: a Tavily, sem achar nada relevante, retornou sua própria página institucional como resultado de baixo score, e o parser extraiu `support@tavily.com` como "e-mail do hotel" e o próprio nome do hotel buscado como "país". Corrigido com três camadas: (1) `tavily.com` adicionado a `DOMINIOS_IGNORADOS`; (2) resultados brutos (`results`) com `score` do Tavily abaixo de `0.3` passam a ser descartados antes da extração (ruído de baixa relevância); (3) frases da resposta sintetizada (`answer`) que contêm negação ("sources do/does not provide/mention...") são removidas antes de extrair e-mail/país — por frase, não a resposta inteira, para não perder um dado real citado na mesma resposta de um hotel que de fato existe (caso real validado: Hilton Lisbon tem uma frase de negação seguida de e-mail/país reais, que precisam ser preservados).
+- Validação adicional na fronteira com a persistência (`src/features/hotels/enrich.ts`): mesmo com as salvaguardas acima no client, o e-mail/país retornados por `buscarContatoHotel` passam por validação de formato (`EMAIL_FORMATO_VALIDO`/`PAIS_FORMATO_VALIDO`) antes do insert — nunca grava na base um valor que não pareça um e-mail/nome de país válido, mesmo que a extração tenha "achado" algo.
+- Erro HTTP da Tavily deixou de propagar o corpo bruto da resposta (`client.ts`) — mensagem genérica com o status, para não vazar detalhe de infraestrutura numa resposta de API caso o chamador devolva `error.message` cru.
+- `src/lib/tavily/client.ts` e `src/features/hotels/enrich.ts` ganharam `import "server-only"` (pacote `server-only`, instalado nesta sessão) — trava de build contra um import futuro acidental desses módulos (que leem `TAVILY_API_KEY`) a partir de um Client Component. `vitest.config.ts` ganhou um alias (`src/lib/test/server-only-noop.ts`) porque esse pacote só funciona dentro do bundler do Next.js, não em Vitest puro.
 
 **Commit final:** `feat: busca automática de e-mail e país de hotel via Tavily`
 
