@@ -7,6 +7,10 @@
     {
       "path": "/api/jobs/enviar-pendentes",
       "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/jobs/cobrar-hoteis",
+      "schedule": "0 12 * * *"
     }
   ]
 }

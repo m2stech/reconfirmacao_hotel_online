@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUserWithProfile } from "@/lib/supabase/profile";
 import { UserMenu } from "@/components/user-menu";
+import { NotificationsMenu } from "@/components/notifications-menu";
 
 export async function SiteHeader() {
   const { user, profile } = await getCurrentUserWithProfile();
@@ -38,6 +39,7 @@ export async function SiteHeader() {
                 </>
               ) : null}
             </nav>
+            <NotificationsMenu />
             <UserMenu name={profile?.full_name ?? user.email ?? ""} />
           </div>
         ) : null}

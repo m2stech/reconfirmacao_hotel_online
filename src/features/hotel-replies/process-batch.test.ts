@@ -6,6 +6,7 @@ function pendenteBase(overrides: Partial<ReservaPendenteDeResposta> = {}): Reser
   return {
     emailSendId: "send-1",
     reservationId: "reserva-1",
+    createdByEnvioOriginal: null,
     envio: {
       destinatario: "reservas@hotel.test",
       conversationId: "conv-1",
@@ -71,6 +72,8 @@ async function montarAmbiente(options: {
 
   const persistirMock = options.persistirMock ?? vi.fn().mockResolvedValue({ id: "reply-1" });
   vi.doMock("./persist", () => ({ persistirInterpretacao: persistirMock }));
+
+  vi.doMock("@/features/notifications/notify", () => ({ notificar: vi.fn().mockResolvedValue(undefined) }));
 
   return { persistirMock };
 }
@@ -141,6 +144,7 @@ describe("processarLoteDeRespostas", () => {
         }),
       };
     });
+    vi.doMock("@/features/notifications/notify", () => ({ notificar: vi.fn().mockResolvedValue(undefined) }));
 
     const { processarLoteDeRespostas } = await import("./process-batch");
     const supabaseFake = {} as never;
@@ -174,6 +178,7 @@ describe("processarLoteDeRespostas", () => {
       }),
     }));
     vi.doMock("./persist", () => ({ persistirInterpretacao: vi.fn().mockResolvedValue({ id: "reply-1" }) }));
+    vi.doMock("@/features/notifications/notify", () => ({ notificar: vi.fn().mockResolvedValue(undefined) }));
 
     const { processarLoteDeRespostas } = await import("./process-batch");
     const supabaseFake = {} as never;

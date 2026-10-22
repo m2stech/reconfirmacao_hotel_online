@@ -330,13 +330,27 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 
 **Objetivo:** Fechar a funcionalidade de notificação começada no Milestone 10 com a configuração de SLA e os canais in-app/e-mail.
 
-**Entregas:**
-- [ ] Configuração de SLA de resposta do hotel (quantos dias sem resposta dispara alerta) — valor definido com o time (PRD §10, item 3, ainda em aberto)
-- [ ] Notificação in-app (indicador visual no dashboard/header)
-- [ ] Notificação por e-mail ao consultor responsável
-- [ ] Preferências de notificação por usuário (opcional, se o time quiser)
+**Decisões fechadas com o usuário nesta sessão (substituem o item em aberto do PRD §10 item 3):**
+- SLA = cobrança automática ao hotel a cada 24h, até 3 tentativas. Esgotadas as 3 sem resposta, o sistema para de cobrar e só notifica — **sem escalonamento a um broker/fornecedor** (o app de referência não tem esse mecanismo; "broker" ali é só o nome do fornecedor citado no corpo do e-mail ao hotel, nunca um destinatário — confirmado lendo `enviar_email.py`/`respostas.py`/`app.py`). Escalonamento a broker fica para uma etapa futura, pendente de decidir a origem do e-mail do broker (campo manual novo vs. tabela de contatos dedicada).
+- Sem SLA configurável por admin — valor fixo no código (24h / 3 tentativas), menor esforço que uma tela de configuração; pode evoluir depois se o time pedir.
+- Destinatário de notificação por e-mail: o usuário responsável pelo envio original (`email_sends.created_by` → `profiles.email`) + um e-mail de equipe fixo (`NOTIFICACAO_EQUIPE_EMAIL` no `.env`, hoje apontando para conta de teste — troca para `produtos1@bvgroup.com.br` entra no checklist do Milestone 13, mesmo padrão de `MS_GRAPH_AUTHORIZED_EMAIL`, para nunca mandar e-mail de teste a uma caixa de produção — PRD §7.1).
 
-**Commit final:** `feat: notificações de SLA e revisão pendente`
+**Entregas:**
+- [x] Migration `20261022120000_reconfirmacao_notificacoes_cobranca.sql`: colunas `cobranca_tentativas`/`cobranca_ultima_em` em `reservations`; tabela nova `reconfirmacao.notificacoes` (tipo `revisao_humana`/`erro_envio`/`sla_esgotado`) com RLS (SELECT compartilhado, UPDATE restrito à coluna `lida_em` para marcar como lida, INSERT/DELETE só `service_role`); view `audit_status` atualizada para expor os contadores de cobrança
+- [x] `src/features/hotel-replies/collection-pending.ts` + `collection.ts`: lógica de cobrança automática (reenvio via `responderHotel`, preservando thread — mesmo mecanismo do Milestone 7), isolamento de erro por reserva, notificação `sla_esgotado` ao esgotar as 3 tentativas
+- [x] `src/app/api/jobs/cobrar-hoteis/route.ts` + `vercel.json`: novo Cron Job 1x/dia (`0 12 * * *`, mesmo limite do plano Hobby já documentado no Milestone 10) — intervalo real entre cobranças fica em ~24-48h dependendo de quando a reserva cruza o limiar, não exatamente 24h, por conta desse limite
+- [x] `src/features/notifications/`: `queries.ts` (CRUD mínimo de notificação) + `notify.ts` (orquestra registro in-app + e-mail via Graph, melhor esforço — falha de e-mail nunca trava o job/fluxo que notificou)
+- [x] Gatilhos plugados nos pontos existentes: `process-batch.ts` notifica `revisao_humana` quando `statusInterpretacao === "REVISAR"`; `send.ts` (`executarEnvioEregistrar`, usado por envio inicial/reenvio/batch) notifica `erro_envio` em qualquer falha de envio
+- [x] Notificação in-app: `src/components/notifications-menu.tsx` (sino com contador no header, polling 60s) + `/api/notificacoes` (GET lista/conta) + `/api/notificacoes/[id]` (PATCH marca como lida)
+- [x] Testes de unidade de `collection.ts` (cobrança enviada/incrementada, SLA esgotado sem reenviar, erro de envio notificado sem lançar, isolamento de erro por reserva) e ajuste dos testes existentes de `process-batch.ts` para mockar `notificar`
+
+**Lacuna de GRANT corrigida nesta sessão (mesma classe de bug já vista nos Milestones 2/3/5/8):** a policy `email_sends_update` existe desde o hardening do Milestone 2/3 (pensada para marcação de bounce), mas o `GRANT UPDATE` correspondente nunca tinha sido concedido — nem a `authenticated` nem a `service_role` (a migration de grants do Milestone 3 só deu `select, insert` a `email_sends`). Só apareceu ao testar de ponta a ponta: o job de cobrança não conseguia gravar o reenvio em `email_sends`. Corrigido em `20261022123000_reconfirmacao_email_sends_update_grant.sql`.
+
+**Bug de design corrigido nesta sessão (esgotamento de SLA nunca era alcançado):** a primeira versão de `listarReservasParaCobranca` filtrava `cobranca_tentativas < MAX_TENTATIVAS_COBRANCA` na query — o que excluía da lista exatamente a reserva que `collection.ts` precisava notificar como `sla_esgotado` (a lógica de esgotamento era código morto, só descoberto rodando o teste de integração manual). Corrigido: a query passou a incluir `cobranca_tentativas <= MAX` (não `<`), e `cobrarUmaReserva` grava um sentinela (`MAX + 1`) depois de notificar o esgotamento, para não notificar de novo a cada disparo diário do cron.
+
+**Incidente durante o teste de integração manual (sem efeito colateral real confirmado, mas registrado por precaução — PRD §7):** ao rodar o script de teste trocando temporariamente as credenciais Microsoft Graph do `.env` para a conta de teste própria, um dos disparos capturou o `.env` com `destinatario: produtos1@bvgroup.com.br` (caixa de PRODUÇÃO) em vez da conta de teste — causa: o usuário estava editando o `.env` no IDE no mesmo intervalo, e o processo leu o arquivo nesse instante intermediário (`npx tsx --env-file=.env` lê o arquivo uma única vez, no início do processo). O app registration apontado nesse momento (`efe0aa91-...`, credenciais "BV Group") não tem admin consent liberado (403 `ErrorAccessDenied`, documentado desde o Milestone 7/10) — não há confirmação de que o e-mail chegou a ser enviado de fato, e o usuário não tinha acesso imediato à caixa `produtos1@bvgroup.com.br` para confirmar. Teste refeito com sucesso logo depois usando a credencial de teste já ativa no `.env` (`mauricio.ti@bvgroup.com.br`, remetente e destinatário), sem tocar no arquivo durante a execução. **Risco residual não fechado:** verificar manualmente a pasta "Itens Enviados" de `produtos1@bvgroup.com.br` por um e-mail com assunto contendo "Hotel Sintético Teste Milestone 11" datado de 2026-10-21 ~18h49 UTC; se existir, apagar.
+
+**Commit final:** `feat: cobrança automática ao hotel e notificações de revisão/erro/SLA`
 
 ---
 
