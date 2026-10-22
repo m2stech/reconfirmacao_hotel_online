@@ -3,6 +3,7 @@ import type { Database } from "@/lib/supabase/types";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { montarAssunto, montarCorpoHtml, envolverComAssinatura, idiomaPorPais } from "@/lib/graph/email-template";
 import { enviarEmail } from "@/lib/graph/send-mail";
+import { notificar } from "@/features/notifications/notify";
 import { registrarEnvio } from "./queries";
 
 type TypedClient = SupabaseClient<Database>;
@@ -76,6 +77,14 @@ async function executarEnvioEregistrar(
   });
 
   if (!resultadoEnvio.sucesso) {
+    await notificar(supabase, {
+      reservationId: params.reservationId,
+      tipo: "erro_envio",
+      mensagem: `Reserva ${params.localizador}: falha ao enviar e-mail (${params.tipo}).`,
+      assuntoEmail: `[Reconfirmação] Falha no envio de e-mail — ${params.localizador}`,
+      corpoEmail: `<p>O envio de e-mail (${params.tipo}) da reserva <strong>${params.localizador}</strong> falhou: ${resultadoEnvio.erro}</p>`,
+      createdByEnvioOriginal: userId,
+    });
     return { reservationId: params.reservationId, sucesso: false, erro: resultadoEnvio.erro, emailSendId: registro.id };
   }
   return { reservationId: params.reservationId, sucesso: true, emailSendId: registro.id };

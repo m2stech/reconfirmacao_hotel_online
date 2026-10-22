@@ -10,6 +10,7 @@ export type ReservaPendenteDeResposta = {
   reservationId: string;
   envio: EnvioParaBuscaDeResposta;
   dadosParaIA: DadosReservaParaIA;
+  createdByEnvioOriginal: string | null;
 };
 
 /**
@@ -41,7 +42,7 @@ export async function listarReservasAguardandoResposta(
   const { data: envios, error: erroEnvios } = await supabase
     .schema("reconfirmacao")
     .from("email_sends")
-    .select("id, reservation_id, destinatario, assunto, graph_conversation_id, internet_message_id, graph_message_id, created_at")
+    .select("id, reservation_id, destinatario, assunto, graph_conversation_id, internet_message_id, graph_message_id, created_at, created_by")
     .in("id", emailSendIds);
   if (erroEnvios) throw erroEnvios;
 
@@ -74,6 +75,7 @@ export async function listarReservasAguardandoResposta(
     resultado.push({
       emailSendId: envio.id,
       reservationId: reserva.id,
+      createdByEnvioOriginal: envio.created_by,
       envio: {
         destinatario: envio.destinatario,
         conversationId: envio.graph_conversation_id,

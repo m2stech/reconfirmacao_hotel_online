@@ -610,10 +610,54 @@ export type Database = {
         }
         Relationships: []
       }
+      notificacoes: {
+        Row: {
+          created_at: string
+          id: string
+          lida_em: string | null
+          mensagem: string
+          reservation_id: string
+          tipo: Database["reconfirmacao"]["Enums"]["notificacao_tipo"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida_em?: string | null
+          mensagem: string
+          reservation_id: string
+          tipo: Database["reconfirmacao"]["Enums"]["notificacao_tipo"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida_em?: string | null
+          mensagem?: string
+          reservation_id?: string
+          tipo?: Database["reconfirmacao"]["Enums"]["notificacao_tipo"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notificacoes_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "audit_status"
+            referencedColumns: ["reservation_id"]
+          },
+          {
+            foreignKeyName: "notificacoes_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reservations: {
         Row: {
           auditoria_atualizada_em: string | null
           auditoria_atualizada_por: string | null
+          cobranca_tentativas: number
+          cobranca_ultima_em: string | null
           created_at: string
           created_by: string | null
           data_checkin: string | null
@@ -638,6 +682,8 @@ export type Database = {
         Insert: {
           auditoria_atualizada_em?: string | null
           auditoria_atualizada_por?: string | null
+          cobranca_tentativas?: number
+          cobranca_ultima_em?: string | null
           created_at?: string
           created_by?: string | null
           data_checkin?: string | null
@@ -662,6 +708,8 @@ export type Database = {
         Update: {
           auditoria_atualizada_em?: string | null
           auditoria_atualizada_por?: string | null
+          cobranca_tentativas?: number
+          cobranca_ultima_em?: string | null
           created_at?: string
           created_by?: string | null
           data_checkin?: string | null
@@ -699,6 +747,8 @@ export type Database = {
         Row: {
           auditoria_atualizada_em: string | null
           auditoria_atualizada_por: string | null
+          cobranca_tentativas: number | null
+          cobranca_ultima_em: string | null
           data_checkin: string | null
           data_checkout: string | null
           hotel_id: string | null
@@ -746,6 +796,7 @@ export type Database = {
       email_send_kind: "reconfirmacao_inicial" | "reenvio" | "resposta_manual"
       email_send_status: "enviado" | "erro" | "bounce"
       hotel_reply_interpretation_method: "regex" | "ia" | "manual"
+      notificacao_tipo: "revisao_humana" | "erro_envio" | "sla_esgotado"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -894,6 +945,7 @@ export const Constants = {
       email_send_kind: ["reconfirmacao_inicial", "reenvio", "resposta_manual"],
       email_send_status: ["enviado", "erro", "bounce"],
       hotel_reply_interpretation_method: ["regex", "ia", "manual"],
+      notificacao_tipo: ["revisao_humana", "erro_envio", "sla_esgotado"],
     },
   },
 } as const

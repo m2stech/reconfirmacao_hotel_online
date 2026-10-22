@@ -10,6 +10,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { buscarMensagensDaConversa } from "@/lib/graph/read-mail";
+import { notificar } from "@/features/notifications/notify";
 import { listarReservasAguardandoResposta } from "./pending";
 import { listarInternetMessageIdsConhecidos } from "./queries";
 import { interpretarResposta } from "./interpret";
@@ -117,6 +118,17 @@ export async function processarLoteDeRespostas(
         );
         internetIdsConhecidos.add(mensagem.internetMessageId);
         resumo.respostasProcessadas += 1;
+
+        if (resultado.statusInterpretacao === "REVISAR") {
+          await notificar(supabase, {
+            reservationId: pendente.reservationId,
+            tipo: "revisao_humana",
+            mensagem: `Reserva ${pendente.envio.localizador}: resposta do hotel precisa de revisão humana.`,
+            assuntoEmail: `[Reconfirmação] Revisão humana pendente — ${pendente.envio.localizador}`,
+            corpoEmail: `<p>Uma resposta do hotel para a reserva <strong>${pendente.envio.localizador}</strong> foi interpretada, mas precisa de revisão humana antes de ser considerada confirmada.</p>`,
+            createdByEnvioOriginal: pendente.createdByEnvioOriginal,
+          });
+        }
       }
     } catch (erro) {
       resumo.erros.push({ reservationId: pendente.reservationId, erro: descreverErro(erro) });
