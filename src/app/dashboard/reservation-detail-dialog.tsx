@@ -40,6 +40,7 @@ type Reserva = {
   regime_alimentar_confirmado_manual: boolean | null;
   pagamento_manual: string | null;
   tipo_pendencia_manual: string | null;
+  hotel_id: string | null;
   hotels: { nome: string; pais: string | null; idioma: string | null } | null;
 };
 
@@ -66,7 +67,11 @@ export function ReservationDetailDialog({
   const [carregando, setCarregando] = useState(true);
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [envios, setEnvios] = useState<Envio[]>([]);
+  const [temEmailConfirmado, setTemEmailConfirmado] = useState(true);
   const [salvando, setSalvando] = useState(false);
+
+  const [emailManual, setEmailManual] = useState("");
+  const [enviandoEmailManual, setEnviandoEmailManual] = useState(false);
 
   const [statusManual, setStatusManual] = useState<string>("nenhum");
   const [regimeConfirmado, setRegimeConfirmado] = useState(false);
@@ -91,6 +96,7 @@ export function ReservationDetailDialog({
     }
     setReserva(dados.reserva);
     setEnvios(dados.envios);
+    setTemEmailConfirmado(Boolean(dados.temEmailConfirmado));
     setStatusManual(dados.reserva.status_manual ?? "nenhum");
     setRegimeConfirmado(Boolean(dados.reserva.regime_alimentar_confirmado_manual));
     setPagamentoManual(dados.reserva.pagamento_manual ?? "");
@@ -105,6 +111,31 @@ export function ReservationDetailDialog({
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reservationId]);
+
+  async function enviarComEmailManual() {
+    if (!reserva) return;
+    if (!emailManual.trim()) {
+      toast.error("Digite o e-mail do hotel.");
+      return;
+    }
+    setEnviandoEmailManual(true);
+    const resposta = await fetch(`/api/reservations/${reserva.id}/enviar-com-email-manual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailManual.trim() }),
+    });
+    const dados = await resposta.json();
+    setEnviandoEmailManual(false);
+
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao enviar reconfirmação.");
+      return;
+    }
+    toast.success("E-mail do hotel salvo e reconfirmação enviada.");
+    setEmailManual("");
+    await carregarDetalhe();
+    onSaved();
+  }
 
   async function reenviar(envioId: string) {
     setReenviando(true);
@@ -223,7 +254,25 @@ export function ReservationDetailDialog({
 
             <div>
               <h3 className="mb-2 text-sm font-medium">Histórico com o hotel</h3>
-              {envios.length === 0 ? (
+              {envios.length === 0 && !temEmailConfirmado ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
+                  <p className="text-sm text-destructive">
+                    E-mail não encontrado para este hotel — a reconfirmação ainda não foi enviada.
+                    Informe o e-mail de contato para enviar agora.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email@hotel.com"
+                      value={emailManual}
+                      onChange={(event) => setEmailManual(event.target.value)}
+                    />
+                    <Button size="sm" disabled={enviandoEmailManual} onClick={enviarComEmailManual}>
+                      {enviandoEmailManual ? "Enviando..." : "Enviar reconfirmação"}
+                    </Button>
+                  </div>
+                </div>
+              ) : envios.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nenhum e-mail enviado ainda.</p>
               ) : (
                 <div className="flex flex-col gap-2">

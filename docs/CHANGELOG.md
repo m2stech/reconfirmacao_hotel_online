@@ -6,6 +6,20 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-26 — Envio automático pós-import e status "E-mail não encontrado"
+
+Dois problemas reportados pelo usuário em teste de produção no localhost, com volume real de reservas:
+
+1. **Import exigia aprovação implícita demais.** O botão da tela de upload se chamava "Confirmar importação" e dava a entender que o envio dos e-mails ficava pendente de uma segunda etapa — na prática o backend (`/api/reservations/import/confirm`) já envia automaticamente para todo hotel com e-mail confirmado desde o Milestone 7, sem exigir aprovação por reserva. Renomeado o botão/mensagens para deixar isso explícito (`import-form.tsx`): "Importar e enviar reconfirmações".
+2. **Hotel sem e-mail confirmado caía em `NAO_ENVIADO`**, indistinguível de "ainda não processamos essa reserva" — o consultor não tinha como saber, olhando o dashboard, que aquele caso específico precisava de ação manual (inserir e-mail). Resolvido com:
+   - Novo valor de status `EMAIL_NAO_ENCONTRADO` no enum `reconfirmacao.audit_status_manual` e recálculo da view `reconfirmacao.audit_status` (migration `20261026130000`): quando não há `hotel_emails` com `confiabilidade = 'confirmado'` para o hotel da reserva **e** nunca houve tentativa de envio, o status passa a ser `EMAIL_NAO_ENCONTRADO` em vez de `NAO_ENVIADO`.
+   - Nova rota `POST /api/reservations/[id]/enviar-com-email-manual`: grava o e-mail informado pelo consultor em `hotel_emails` (já como `confirmado`, mesmo nível de confiança de uma confirmação em `/hoteis`) e dispara `enviarReconfirmacaoInicial` na mesma chamada.
+   - `ReservationDetailDialog` passa a mostrar um campo de e-mail + botão "Enviar reconfirmação" quando a reserva não tem envio nem e-mail confirmado (`/api/audit/[id]` agora retorna `temEmailConfirmado`).
+
+Essa migration reaproveita exatamente o padrão de aplicação via Supabase Management API (`SUPABASE_ACCESS_TOKEN` + `/v1/projects/{ref}/database/query`) já usado nas sessões anteriores, porque o histórico de migrations do CLI diverge do estado real do projeto (compartilhado com o TripQuote, que aplica as suas por fora deste repositório) — `supabase db push` não é seguro aqui.
+
+---
+
 ## 2026-10-26 — Lançamento em produção (Milestone 13 concluído)
 
 Projeto publicado em `reconfirmacao-hotel-online.vercel.app`. Hardening final: revisão consolidada de RLS (aprovada, sem bloqueantes), revisão de segurança (sem credencial exposta, rotas de job/admin protegidas), remoção de `GOOGLE_PLACES_API_KEY` morta, validação Zod em `/api/reservations/import/confirm`, troca de `MS_GRAPH_AUTHORIZED_EMAIL`/`NOTIFICACAO_EQUIPE_EMAIL` para `produtos1@bvgroup.com.br`.

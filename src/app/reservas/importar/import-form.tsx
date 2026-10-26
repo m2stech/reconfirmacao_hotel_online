@@ -163,17 +163,19 @@ export function ImportForm() {
                 preview.reservas.every((reserva) => reserva.jaProcessado)
               }
             >
-              {confirmacao.status === "enviando" ? "Importando..." : "Confirmar importação"}
+              {confirmacao.status === "enviando" ? "Importando e enviando..." : "Importar e enviar reconfirmações"}
             </Button>
           </div>
 
           {confirmacao.status === "sucesso" ? (
             <Alert>
               <AlertDescription>
-                {confirmacao.importadas} reserva(s) importada(s)
+                {confirmacao.importadas} reserva(s) importada(s) e reconfirmação enviada automaticamente
+                para quem tem e-mail de hotel confirmado
                 {confirmacao.puladas > 0
-                  ? `, ${confirmacao.puladas} pulada(s) por já existir no banco.`
+                  ? `; ${confirmacao.puladas} pulada(s) por já existir no banco.`
                   : "."}
+                {" "}Reservas sem e-mail de contato ficam com status &quot;E-mail não encontrado&quot; no dashboard.
               </AlertDescription>
             </Alert>
           ) : null}

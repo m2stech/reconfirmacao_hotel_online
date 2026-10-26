@@ -32,7 +32,18 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq("reservation_id", id)
     .order("created_at", { ascending: true });
 
-  return NextResponse.json({ ok: true, reserva, envios: envios ?? [] });
+  let temEmailConfirmado = false;
+  if (reserva.hotel_id) {
+    const { count } = await supabase
+      .schema("reconfirmacao")
+      .from("hotel_emails")
+      .select("id", { count: "exact", head: true })
+      .eq("hotel_id", reserva.hotel_id)
+      .eq("confiabilidade", "confirmado");
+    temEmailConfirmado = (count ?? 0) > 0;
+  }
+
+  return NextResponse.json({ ok: true, reserva, envios: envios ?? [], temEmailConfirmado });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

@@ -13,6 +13,7 @@ export const STATUS_AUDITORIA = [
   "ERRO_NO_ENVIO",
   "NAO_CONFIRMADA",
   "NAO_ENVIADO",
+  "EMAIL_NAO_ENCONTRADO",
 ] as const;
 
 export type StatusAuditoria = (typeof STATUS_AUDITORIA)[number];
@@ -26,6 +27,7 @@ export const STATUS_LABEL: Record<StatusAuditoria, string> = {
   ERRO_NO_ENVIO: "Erro no envio",
   NAO_CONFIRMADA: "Não confirmada",
   NAO_ENVIADO: "Não enviado",
+  EMAIL_NAO_ENCONTRADO: "E-mail não encontrado",
 };
 
 export const STATUS_BADGE_VARIANT: Record<
@@ -40,13 +42,16 @@ export const STATUS_BADGE_VARIANT: Record<
   ERRO_NO_ENVIO: "destructive",
   NAO_CONFIRMADA: "destructive",
   NAO_ENVIADO: "outline",
+  EMAIL_NAO_ENCONTRADO: "destructive",
 };
 
 // Subconjunto dos status que o consultor pode definir manualmente — exclui
-// NAO_ENVIADO, que só faz sentido como ausência de override (nunca enviado).
+// NAO_ENVIADO e EMAIL_NAO_ENCONTRADO, que só fazem sentido como ausência de
+// override (cálculo automático a partir do que existe ou não em hotel_emails
+// e email_sends).
 export const STATUS_MANUAL_OPCOES = STATUS_AUDITORIA.filter(
-  (status) => status !== "NAO_ENVIADO"
-) as Exclude<StatusAuditoria, "NAO_ENVIADO">[];
+  (status) => status !== "NAO_ENVIADO" && status !== "EMAIL_NAO_ENCONTRADO"
+) as Exclude<StatusAuditoria, "NAO_ENVIADO" | "EMAIL_NAO_ENCONTRADO">[];
 
 // PRD §4.1 item 6: não pode marcar CONFIRMADA sem regime alimentar confirmado.
 export function validarStatusManual(
@@ -66,4 +71,5 @@ export const METRICA_CARDS: { status: StatusAuditoria | "TOTAL"; label: string }
   { status: "REVISAR", label: "Revisar" },
   { status: "RESPONDIDO_AO_HOTEL", label: "Respondido ao hotel" },
   { status: "ERRO_NO_ENVIO", label: "Erro no envio" },
+  { status: "EMAIL_NAO_ENCONTRADO", label: "E-mail não encontrado" },
 ];
