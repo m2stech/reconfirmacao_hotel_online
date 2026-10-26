@@ -376,15 +376,28 @@ Convenção de branch: `milestone/NN-slug`, a partir de `main`. Cada milestone �
 **Objetivo:** Fechar lacunas de produção antes do go-live: segurança, observabilidade, checklist de troca de ambiente de teste para produção.
 
 **Entregas:**
-- [ ] Checklist de troca de ambiente executado: `MS_GRAPH_AUTHORIZED_EMAIL` trocado da conta de teste para `produtos1@bvgroup.com.br`, app registration com admin consent de produção configurado (PRD §10, item 1)
+- [x] Checklist de troca de ambiente executado: `MS_GRAPH_AUTHORIZED_EMAIL` e `NOTIFICACAO_EQUIPE_EMAIL` trocados da conta de teste para `produtos1@bvgroup.com.br` (`.env` local + env vars de produção na Vercel) — confirmado com o usuário que o app registration de produção (BV Group) já tem admin consent liberado para `Mail.Read`/`Mail.Send`/`Mail.ReadWrite` (PRD §10, item 1)
 - [ ] Domínio de produção (Vercel) adicionado em Supabase → Authentication → URL Configuration → Redirect URLs, sem remover o `localhost` ainda em uso por quem desenvolve; `redirectTo` do fluxo de reset de senha (Milestone 1) atualizado para a URL de produção
-- [ ] Revisão final de RLS em todas as tabelas de `reconfirmacao` (agente `supabase-rls-reviewer`)
-- [ ] Revisão de segurança (`security-audit`/`senior-secops`): nenhum segredo hardcoded, nenhum vazamento de prompt/chave para o client
+- [x] Revisão final de RLS em todas as tabelas de `reconfirmacao` (agente `supabase-rls-reviewer`) — **aprovado, sem achados bloqueantes**, cobrindo as 11 migrations acumuladas desde o Milestone 2
+- [x] Revisão de segurança: nenhum segredo hardcoded, nenhum vazamento de chave para o client, rotas `/api/jobs/*` e `/api/admin/*` protegidas, `.env` nunca commitado — ver achados abaixo
 - [ ] Budget alert configurado na OpenAI e no Tavily (PRD §12.5)
-- [ ] Variáveis de ambiente de produção configuradas na Vercel e no Supabase, a partir do `.env` (nunca digitadas direto sem estarem documentadas em `.env.example`)
-- [ ] Deploy de produção na Vercel
+- [x] Variáveis de ambiente de produção configuradas na Vercel (`vercel link` ao projeto já existente `reconfirmacao-hotel-online`), a partir do `.env`
+- [ ] Deploy de produção na Vercel (deploy inicial já existe desde o Milestone 10, em `reconfirmacao-hotel-online.vercel.app`; deploy final com as correções deste milestone ainda pendente — decisão desta sessão: só preparar, não disparar `vercel --prod` sem aprovação explícita do usuário)
 - [ ] Teste de fumaça em produção: login, upload de reserva sintética, dashboard carrega, sem nenhum envio real disparado no teste de fumaça
 - [ ] Observabilidade mínima: logs de erro de job assíncrono visíveis (Vercel dashboard ou equivalente)
+
+**Achados da revisão de RLS consolidada (não bloqueantes, registrados como débito técnico pós-go-live):**
+- DELETE em `hotels`/`hotel_emails` fora do fluxo de merge cascateia `hotel_emails` silenciosamente (`on delete cascade`), sem soft-delete nem restrição a `service_role` — risco real de perda de e-mail de contato se um consultor apagar hotel fora da função de merge. Sugestão do reviewer: revogar DELETE de `authenticated` em `hotels`/`hotel_emails` (mesmo padrão já usado em `reservations_delete_service_role`) ou adicionar trigger que bloqueie exclusão com `hotel_emails` vinculados fora de merge.
+- DELETE de correção de dado via `service_role` (scripts manuais) não registra `audit_log` — sem soft-delete/histórico, a remoção não deixa rastro. Sugestão: inserir manualmente uma linha em `public.audit_log` (`entity_type: 'reservation'`/`'hotel'`) antes/depois de qualquer DELETE de correção futuro.
+- `hotel_replies` não tem coluna de "versão do prompt" — se os prompts de IA mudarem ao longo do tempo, não há como correlacionar custo/qualidade por versão retroativamente. Achado informativo, sem ação nesta sessão.
+
+**Achados da revisão de segurança (aplicados nesta sessão):**
+- `GOOGLE_PLACES_API_KEY` existia em `.env`, `.env.example` e nas env vars da Vercel sem nenhuma referência no código (`src/`) — resíduo morto de uma abordagem de matching anterior ao Tavily (Milestone 8). Removido dos três lugares.
+- Rotas de API faziam só `as Tipo` (cast TypeScript em tempo de compilação) no body da request, sem validação de shape em runtime — risco de payload malformado do client chegar a `criarHotelComEnriquecimentoTavily`/`enviarReconfirmacaoInicial` sem forma esperada. Corrigido em `POST /api/reservations/import/confirm` (a rota mais sensível — dispara criação de hotel e envio de e-mail a partir do payload) com `zod` (`safeParse`, 400 com `issues` detalhadas em caso de payload inválido); `zod` promovido de dependência transitiva (via `zod-validation-error`) para dependência direta do projeto. `POST /api/reservations/import/preview` não precisou de schema — recebe `FormData`/`File`, não JSON estruturado.
+- Confirmado: nenhuma credencial hardcoded em `src/`, nenhum segredo sensível alcançável a partir de código `"use client"`, as 3 rotas `/api/jobs/*` exigem `CRON_SECRET` via `Authorization: Bearer`, `.gitignore` cobre `.env` e não há histórico de commit vazando o arquivo, as 3 rotas `/api/admin/*` usam `requireAdmin()`, nenhum `dangerouslySetInnerHTML` no projeto (resposta de hotel renderizada como texto React normal, sem risco de XSS).
+- A skill `senior-secops` deste projeto não tem conteúdo real aplicável (é um template genérico de scaffold, sem scripts/checklists específicos) — a revisão foi feita diretamente via grep/leitura de código em vez de invocar a skill.
+
+**Nota sobre o deploy já existente:** o projeto já estava publicado desde o Milestone 10 em `reconfirmacao-hotel-online.vercel.app` (deploy feito só para validar o limite de Cron Jobs do plano Hobby). Nesta sessão o diretório local foi linkado a esse mesmo projeto Vercel (`vercel link`) — nenhum projeto novo foi criado.
 
 **Commit final:** `chore: checklist de produção e deploy inicial`
 

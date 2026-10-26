@@ -1,15 +1,32 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import type { ReservaConsolidadaComHotel } from "@/features/reservations/parse-rooming-list";
 import { enviarReconfirmacaoInicial } from "@/features/email-sends/send";
 import { criarHotelComEnriquecimentoTavily } from "@/features/hotels/enrich";
 import { buscarHoteisParaMatch } from "@/features/hotels/queries";
 import { encontrarMelhorMatch } from "@/features/hotels/match";
 
-type ConfirmarImportacaoBody = {
-  arquivoNome: string;
-  reservas: ReservaConsolidadaComHotel[];
-};
+const reservaSchema = z.object({
+  localizador: z.string().min(1),
+  localizadorExterno: z.string().nullable(),
+  hotelNome: z.string().min(1),
+  fornecedor: z.string().nullable(),
+  dataCheckin: z.string().nullable(),
+  dataCheckout: z.string().nullable(),
+  tipoHabitacao: z.string().nullable(),
+  regimeAlimentar: z.string().nullable(),
+  hospedes: z.array(z.object({ nome: z.string() })),
+  linhasOriginais: z.number(),
+  hotelId: z.string().nullable(),
+  hotelMatchConfianca: z.number(),
+  jaProcessado: z.boolean(),
+  jaProcessadoEm: z.string().nullable(),
+});
+
+const confirmarImportacaoSchema = z.object({
+  arquivoNome: z.string().min(1),
+  reservas: z.array(reservaSchema).min(1),
+});
 
 type ResultadoEnvioRelatorio = {
   localizador: string;
@@ -27,10 +44,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, erro: "Não autenticado." }, { status: 401 });
   }
 
-  const body = (await request.json()) as ConfirmarImportacaoBody;
-  if (!Array.isArray(body.reservas) || body.reservas.length === 0) {
-    return NextResponse.json({ ok: false, erro: "Nenhuma reserva para importar." }, { status: 400 });
+  const payload = confirmarImportacaoSchema.safeParse(await request.json());
+  if (!payload.success) {
+    return NextResponse.json(
+      { ok: false, erro: "Payload de importação inválido.", detalhes: payload.error.issues },
+      { status: 400 }
+    );
   }
+  const body = payload.data;
 
   // Resolve o hotel_id real de cada reserva ANTES de checar dedupe — nunca
   // confiar cegamente no reserva.hotelId do payload, que vem do preview
