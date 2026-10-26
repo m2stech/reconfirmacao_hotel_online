@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -82,24 +83,26 @@ export function NotificationsMenu() {
         }
       />
       <DropdownMenuContent align="end" className="w-80">
-        <DropdownMenuLabel>Notificações</DropdownMenuLabel>
-        {notificacoes.length === 0 ? (
-          <div className="px-1.5 py-2 text-sm text-muted-foreground">Nenhuma notificação.</div>
-        ) : (
-          notificacoes.map((notificacao) => (
-            <DropdownMenuItem
-              key={notificacao.id}
-              className="flex-col items-start gap-0.5 whitespace-normal"
-              onClick={() => marcarComoLida(notificacao.id)}
-            >
-              <span className="text-xs font-medium text-muted-foreground">
-                {ROTULO_TIPO[notificacao.tipo]}
-                {notificacao.lida_em === null ? " · não lida" : ""}
-              </span>
-              <span>{notificacao.mensagem}</span>
-            </DropdownMenuItem>
-          ))
-        )}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Notificações</DropdownMenuLabel>
+          {notificacoes.length === 0 ? (
+            <div className="px-1.5 py-2 text-sm text-muted-foreground">Nenhuma notificação.</div>
+          ) : (
+            notificacoes.map((notificacao) => (
+              <DropdownMenuItem
+                key={notificacao.id}
+                className="flex-col items-start gap-0.5 whitespace-normal"
+                onClick={() => marcarComoLida(notificacao.id)}
+              >
+                <span className="text-xs font-medium text-muted-foreground">
+                  {ROTULO_TIPO[notificacao.tipo]}
+                  {notificacao.lida_em === null ? " · não lida" : ""}
+                </span>
+                <span>{notificacao.mensagem}</span>
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

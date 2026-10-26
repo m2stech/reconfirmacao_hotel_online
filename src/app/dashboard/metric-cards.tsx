@@ -1,8 +1,13 @@
+import { connection } from "next/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { METRICA_CARDS } from "@/features/audit/status";
 
 export async function MetricCards() {
+  // Mesmo boundary dinâmico de getCurrentUserWithProfile (Milestone 13) —
+  // sem isso, o Next 16 Cache Components tenta prerenderizar esta query e
+  // expõe Date.now() do SDK Supabase (checagem de sessão) como erro.
+  await connection();
   const supabase = await createClient();
 
   const contagens = await Promise.all(
