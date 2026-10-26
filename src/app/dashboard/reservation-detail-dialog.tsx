@@ -67,7 +67,7 @@ export function ReservationDetailDialog({
   const [carregando, setCarregando] = useState(true);
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [envios, setEnvios] = useState<Envio[]>([]);
-  const [temEmailConfirmado, setTemEmailConfirmado] = useState(true);
+  const [temEmailDisponivel, setTemEmailDisponivel] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
   const [emailManual, setEmailManual] = useState("");
@@ -96,7 +96,7 @@ export function ReservationDetailDialog({
     }
     setReserva(dados.reserva);
     setEnvios(dados.envios);
-    setTemEmailConfirmado(Boolean(dados.temEmailConfirmado));
+    setTemEmailDisponivel(Boolean(dados.temEmailDisponivel));
     setStatusManual(dados.reserva.status_manual ?? "nenhum");
     setRegimeConfirmado(Boolean(dados.reserva.regime_alimentar_confirmado_manual));
     setPagamentoManual(dados.reserva.pagamento_manual ?? "");
@@ -254,7 +254,7 @@ export function ReservationDetailDialog({
 
             <div>
               <h3 className="mb-2 text-sm font-medium">Histórico com o hotel</h3>
-              {envios.length === 0 && !temEmailConfirmado ? (
+              {envios.length === 0 && !temEmailDisponivel ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
                   <p className="text-sm text-destructive">
                     E-mail não encontrado para este hotel — a reconfirmação ainda não foi enviada.

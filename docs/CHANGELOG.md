@@ -6,6 +6,19 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-26 — Correção: e-mail "sugerido" (Tavily) também dispara envio automático
+
+Bug reportado pelo usuário logo após o deploy da mudança anterior: a tela `/hoteis` continuava mostrando e-mails recém-encontrados pelo Tavily como "A confirmar" e o import não disparava envio para eles — a trava de "só e-mail confirmado por humano dispara envio automático" (PRD §4.2 item 2) nunca tinha sido removida, só o status `NAO_ENVIADO`/`EMAIL_NAO_ENCONTRADO` foi ajustado por cima dela. Resultado: toda reserva cujo hotel só tinha e-mail sugerido continuava sem envio, sem diferença prática do comportamento antigo.
+
+Corrigido removendo essa trava a pedido explícito do usuário (volume real de reservas torna inviável revisar e-mail por e-mail antes de cada import):
+- `/api/reservations/import/confirm`: usa qualquer e-mail do hotel (prioriza `confirmado` quando há mais de um, mas não exige mais).
+- Migration `20261026140000`: `EMAIL_NAO_ENCONTRADO` na view `audit_status` agora significa "nenhum e-mail cadastrado" (confirmado ou sugerido), não mais "nenhum confirmado".
+- `/api/audit/[id]` e `ReservationDetailDialog`: campo renomeado de `temEmailConfirmado` para `temEmailDisponivel`, mesma mudança de semântica.
+
+A confirmação manual em `/hoteis` continua existindo como ação do consultor (ele ainda pode promover um e-mail sugerido a confirmado, ou corrigi-lo), só deixou de ser pré-requisito do primeiro envio.
+
+---
+
 ## 2026-10-26 — Envio automático pós-import e status "E-mail não encontrado"
 
 Dois problemas reportados pelo usuário em teste de produção no localhost, com volume real de reservas:

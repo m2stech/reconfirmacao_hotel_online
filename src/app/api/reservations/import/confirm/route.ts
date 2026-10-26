@@ -178,10 +178,15 @@ export async function POST(request: NextRequest) {
       .eq("id", inserida.hotel_id)
       .single();
 
-    // Só usa e-mail já confirmado por humano para envio automático — e-mail
-    // "sugerido" (descoberto por Tavily, Milestone 8) exige confirmação
-    // manual em /hoteis antes do primeiro uso (PRD §4.2, item 2).
-    const emailHotel = (hotel?.hotel_emails ?? []).find((e) => e.confiabilidade === "confirmado");
+    // Envio automático usa qualquer e-mail disponível — confirmado por
+    // humano ou sugerido pelo Tavily (Milestone 8). A confirmação manual em
+    // /hoteis deixou de ser pré-requisito do primeiro envio (mudança
+    // 2026-10-26, pedido explícito do usuário: volume de reservas torna
+    // inviável revisar e-mail por e-mail antes de cada import). Prioriza
+    // confirmado quando existir mais de um.
+    const emailsDoHotel = hotel?.hotel_emails ?? [];
+    const emailHotel =
+      emailsDoHotel.find((e) => e.confiabilidade === "confirmado") ?? emailsDoHotel[0];
 
     if (erroHotel || !hotel || !emailHotel) {
       semHotelOuEmail += 1;
@@ -189,7 +194,7 @@ export async function POST(request: NextRequest) {
         localizador: inserida.localizador,
         hotelNome: reservaOriginal.hotelNome,
         sucesso: false,
-        motivo: "Hotel sem e-mail de contato confirmado — reserva gravada, e-mail não enviado (confirme o contato em /hoteis).",
+        motivo: "Hotel sem nenhum e-mail de contato cadastrado — reserva gravada, e-mail não enviado (insira o e-mail no detalhe da reserva ou em /hoteis).",
       });
       continue;
     }

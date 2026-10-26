@@ -32,18 +32,20 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq("reservation_id", id)
     .order("created_at", { ascending: true });
 
-  let temEmailConfirmado = false;
+  // Qualquer e-mail (confirmado ou sugerido pelo Tavily) já dispara o envio
+  // automático — ver migration 20261026140000. "Sem e-mail" só significa
+  // nenhuma linha em hotel_emails para o hotel, não ausência de confirmação.
+  let temEmailDisponivel = false;
   if (reserva.hotel_id) {
     const { count } = await supabase
       .schema("reconfirmacao")
       .from("hotel_emails")
       .select("id", { count: "exact", head: true })
-      .eq("hotel_id", reserva.hotel_id)
-      .eq("confiabilidade", "confirmado");
-    temEmailConfirmado = (count ?? 0) > 0;
+      .eq("hotel_id", reserva.hotel_id);
+    temEmailDisponivel = (count ?? 0) > 0;
   }
 
-  return NextResponse.json({ ok: true, reserva, envios: envios ?? [], temEmailConfirmado });
+  return NextResponse.json({ ok: true, reserva, envios: envios ?? [], temEmailDisponivel });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
