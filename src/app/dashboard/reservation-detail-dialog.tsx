@@ -240,7 +240,7 @@ export function ReservationDetailDialog({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl">
+      <DialogContent className="max-w-2xl sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalhe da reserva {reserva?.localizador ?? ""}</DialogTitle>
         </DialogHeader>

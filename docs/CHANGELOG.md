@@ -6,6 +6,14 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-27 — Scroll no modal de detalhe da reserva
+
+Com o e-mail completo do hotel (melhoria anterior) e sua tradução expandidos, o conteúdo do `ReservationDetailDialog` passou a ultrapassar a altura da tela em respostas longas, cortando o topo (título) e o rodapé (botões Cancelar/Salvar) para fora da área visível — sem como rolar.
+
+`DialogContent` (componente genérico em `components/ui/dialog.tsx`) não tem `max-height`/`overflow` por padrão; não alterado ali para não afetar outros dialogs do app. Em vez disso, `max-h-[85vh] overflow-y-auto` foi adicionado só na instância deste dialog (`reservation-detail-dialog.tsx`). Efeito colateral aceito: `DialogFooter` (que antes ficava fixo colado na borda inferior) agora rola junto com o resto do conteúdo — troca razoável por garantir que título e botões fiquem sempre alcançáveis via scroll.
+
+---
+
 ## 2026-10-27 — Botão de tradução do e-mail completo do hotel
 
 Segue direto da melhoria anterior (abaixo): como o e-mail completo do hotel passou a ficar visível, boa parte chega em inglês/alemão/espanhol (hotéis internacionais) e o consultor pediu uma forma de traduzir sem sair da tela.
