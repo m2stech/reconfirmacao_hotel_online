@@ -6,6 +6,14 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-27 — Dialog de reserva mostra o e-mail completo do hotel, não só o resumo da IA
+
+Usuário reportou que, para validar uma resposta divergente com confiança, precisava ver a mensagem real do hotel — só tinha acesso ao `resumo` gerado pelo `gpt-5-nano`, que pode errar ou simplificar demais (caso real: resumo apontando "divergência de fornecedor" sem o consultor conseguir conferir o texto original).
+
+`reconfirmacao.hotel_replies.corpo_texto` (corpo integral da resposta do hotel) já era gravado desde o Milestone 6 e já vinha na resposta de `/api/audit/[id]` (`select("*, hotel_replies(*)")`), só não era exibido. Adicionado um `<details>` "Ver e-mail completo do hotel" em `ReservationDetailDialog` sob cada resposta, mostrando `corpo_texto` com `whitespace-pre-wrap`. Nenhuma mudança de API ou migration necessária — só UI.
+
+---
+
 ## 2026-10-26 — Correção: e-mail "sugerido" (Tavily) também dispara envio automático
 
 Bug reportado pelo usuário logo após o deploy da mudança anterior: a tela `/hoteis` continuava mostrando e-mails recém-encontrados pelo Tavily como "A confirmar" e o import não disparava envio para eles — a trava de "só e-mail confirmado por humano dispara envio automático" (PRD §4.2 item 2) nunca tinha sido removida, só o status `NAO_ENVIADO`/`EMAIL_NAO_ENCONTRADO` foi ajustado por cima dela. Resultado: toda reserva cujo hotel só tinha e-mail sugerido continuava sem envio, sem diferença prática do comportamento antigo.

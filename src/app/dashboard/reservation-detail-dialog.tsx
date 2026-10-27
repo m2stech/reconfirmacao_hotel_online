@@ -294,6 +294,16 @@ export function ReservationDetailDialog({
                             Resposta em {new Date(resposta.recebido_em).toLocaleString("pt-BR")}
                           </p>
                           <p>{resposta.resumo ?? resposta.corpo_texto}</p>
+                          {resposta.resumo ? (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                                Ver e-mail completo do hotel
+                              </summary>
+                              <p className="mt-1 whitespace-pre-wrap rounded border border-border bg-background p-2">
+                                {resposta.corpo_texto}
+                              </p>
+                            </details>
+                          ) : null}
                         </div>
                       ))}
 
