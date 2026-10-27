@@ -187,3 +187,59 @@ export async function interpretarRespostaIA(
 
   return { analise, consumo };
 }
+
+export type ResultadoTraducaoIA = {
+  textoTraduzido: string;
+  consumo: ConsumoOpenAI;
+};
+
+/**
+ * Tradução sob demanda do corpo integral de uma resposta de hotel, para o
+ * consultor conferir o e-mail original sem depender só do resumo da IA. Só
+ * chamada quando o usuário clica no botão "Traduzir" (nunca em todo envio) —
+ * mesmo client/modelo de interpretarRespostaIA, sem JSON Schema.
+ */
+export async function traduzirTextoIA(texto: string): Promise<ResultadoTraducaoIA> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY não configurada.");
+  }
+
+  const resposta = await fetch(OPENAI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Traduza o texto a seguir para português brasileiro. Preserve o sentido, os números, nomes próprios e a formatação em linhas. Retorne apenas o texto traduzido, sem comentários nem aspas.",
+        },
+        { role: "user", content: texto },
+      ],
+    }),
+  });
+
+  if (!resposta.ok) {
+    const corpoErro = await resposta.text();
+    throw new Error(`Falha ao consultar OpenAI (HTTP ${resposta.status}): ${corpoErro}`);
+  }
+
+  const dados = (await resposta.json()) as {
+    choices: { message: { content: string } }[];
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+
+  const textoTraduzido = dados.choices?.[0]?.message?.content;
+  if (!textoTraduzido) {
+    throw new Error("Resposta da OpenAI sem conteúdo.");
+  }
+
+  const consumo = calcularCustoOpenAI(dados.usage?.prompt_tokens ?? 0, dados.usage?.completion_tokens ?? 0);
+
+  return { textoTraduzido, consumo };
+}

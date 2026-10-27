@@ -52,7 +52,7 @@ type Envio = {
   assunto: string;
   created_at: string;
   erro_detalhe?: string | null;
-  hotel_replies: { recebido_em: string; resumo: string | null; corpo_texto: string }[];
+  hotel_replies: { id: string; recebido_em: string; resumo: string | null; corpo_texto: string }[];
 };
 
 export function ReservationDetailDialog({
@@ -86,6 +86,32 @@ export function ReservationDetailDialog({
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
   const [textoResposta, setTextoResposta] = useState("");
   const [enviandoResposta, setEnviandoResposta] = useState(false);
+
+  const [traducoes, setTraducoes] = useState<Record<string, string>>({});
+  const [mostrandoTraducaoId, setMostrandoTraducaoId] = useState<Record<string, boolean>>({});
+  const [traduzindoId, setTraduzindoId] = useState<string | null>(null);
+
+  async function traduzirResposta(hotelReplyId: string) {
+    if (traducoes[hotelReplyId]) {
+      setMostrandoTraducaoId((atual) => ({ ...atual, [hotelReplyId]: !atual[hotelReplyId] }));
+      return;
+    }
+    setTraduzindoId(hotelReplyId);
+    try {
+      const resposta = await fetch(`/api/hotel-replies/${hotelReplyId}/traduzir`, { method: "POST" });
+      const dados = await resposta.json();
+      if (!dados.ok) {
+        toast.error(dados.erro ?? "Falha ao traduzir.");
+        return;
+      }
+      setTraducoes((atual) => ({ ...atual, [hotelReplyId]: dados.textoTraduzido }));
+      setMostrandoTraducaoId((atual) => ({ ...atual, [hotelReplyId]: true }));
+    } catch {
+      toast.error("Falha ao traduzir.");
+    } finally {
+      setTraduzindoId(null);
+    }
+  }
 
   async function carregarDetalhe() {
     const resposta = await fetch(`/api/audit/${reservationId}`);
@@ -299,9 +325,26 @@ export function ReservationDetailDialog({
                               <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
                                 Ver e-mail completo do hotel
                               </summary>
-                              <p className="mt-1 whitespace-pre-wrap rounded border border-border bg-background p-2">
-                                {resposta.corpo_texto}
-                              </p>
+                              <div className="mt-1 rounded border border-border bg-background p-2">
+                                <p className="whitespace-pre-wrap">
+                                  {mostrandoTraducaoId[resposta.id] && traducoes[resposta.id]
+                                    ? traducoes[resposta.id]
+                                    : resposta.corpo_texto}
+                                </p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="mt-2"
+                                  disabled={traduzindoId === resposta.id}
+                                  onClick={() => traduzirResposta(resposta.id)}
+                                >
+                                  {traduzindoId === resposta.id
+                                    ? "Traduzindo..."
+                                    : mostrandoTraducaoId[resposta.id] && traducoes[resposta.id]
+                                      ? "Ver original"
+                                      : "Traduzir para português"}
+                                </Button>
+                              </div>
                             </details>
                           ) : null}
                         </div>

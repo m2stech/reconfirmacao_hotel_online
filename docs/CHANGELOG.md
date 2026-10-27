@@ -6,6 +6,16 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-27 — Botão de tradução do e-mail completo do hotel
+
+Segue direto da melhoria anterior (abaixo): como o e-mail completo do hotel passou a ficar visível, boa parte chega em inglês/alemão/espanhol (hotéis internacionais) e o consultor pediu uma forma de traduzir sem sair da tela.
+
+- Nova função `traduzirTextoIA` em `lib/openai/client.ts`: chamada simples ao `gpt-5-nano` (sem JSON Schema), prompt fixo de tradução PT-BR preservando números/nomes/formatação.
+- Nova rota `POST /api/hotel-replies/[id]/traduzir`: busca `corpo_texto` da resposta pelo `hotel_replies.id` e traduz. Sem `audit_log` — é leitura, não altera estado da reserva.
+- `ReservationDetailDialog`: botão "Traduzir para português" dentro do `<details>` do e-mail completo, com cache em memória por `hotel_replies.id` (não retraduz ao alternar "Ver original"/"Ver tradução") e chamada só sob demanda — nunca automática, para não gerar custo de API em todo envio/carregamento de tela (PRD §7 nunca se aplica aqui pois é ação explícita do usuário, não teste, mas o princípio de não gastar API à toa segue valendo).
+
+---
+
 ## 2026-10-27 — Dialog de reserva mostra o e-mail completo do hotel, não só o resumo da IA
 
 Usuário reportou que, para validar uma resposta divergente com confiança, precisava ver a mensagem real do hotel — só tinha acesso ao `resumo` gerado pelo `gpt-5-nano`, que pode errar ou simplificar demais (caso real: resumo apontando "divergência de fornecedor" sem o consultor conseguir conferir o texto original).
