@@ -83,6 +83,10 @@ export function ReservationDetailDialog({
   const [assuntoReenvio, setAssuntoReenvio] = useState("");
   const [reenviando, setReenviando] = useState(false);
 
+  const [corrigindoEmail, setCorrigindoEmail] = useState(false);
+  const [emailCorrigido, setEmailCorrigido] = useState("");
+  const [enviandoCorrecaoEmail, setEnviandoCorrecaoEmail] = useState(false);
+
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
   const [textoResposta, setTextoResposta] = useState("");
   const [enviandoResposta, setEnviandoResposta] = useState(false);
@@ -159,6 +163,32 @@ export function ReservationDetailDialog({
     }
     toast.success("E-mail do hotel salvo e reconfirmação enviada.");
     setEmailManual("");
+    await carregarDetalhe();
+    onSaved();
+  }
+
+  async function corrigirEmailEReenviar() {
+    if (!reserva) return;
+    if (!emailCorrigido.trim()) {
+      toast.error("Digite o e-mail correto do hotel.");
+      return;
+    }
+    setEnviandoCorrecaoEmail(true);
+    const resposta = await fetch(`/api/reservations/${reserva.id}/corrigir-email-e-reenviar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailCorrigido.trim() }),
+    });
+    const dados = await resposta.json();
+    setEnviandoCorrecaoEmail(false);
+
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao corrigir e-mail e reenviar.");
+      return;
+    }
+    toast.success("E-mail do hotel corrigido e reconfirmação reenviada.");
+    setCorrigindoEmail(false);
+    setEmailCorrigido("");
     await carregarDetalhe();
     onSaved();
   }
@@ -279,7 +309,43 @@ export function ReservationDetailDialog({
             <Separator />
 
             <div>
-              <h3 className="mb-2 text-sm font-medium">Histórico com o hotel</h3>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-sm font-medium">Histórico com o hotel</h3>
+                {envios.length > 0 ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setCorrigindoEmail((atual) => !atual);
+                      setEmailCorrigido("");
+                    }}
+                  >
+                    {corrigindoEmail ? "Cancelar" : "Corrigir e-mail do hotel"}
+                  </Button>
+                ) : null}
+              </div>
+
+              {corrigindoEmail ? (
+                <div className="mb-2 flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Use quando o e-mail cadastrado do hotel está incorreto (ex. resposta de outro
+                    fornecedor/domínio). O e-mail atual é substituído e a reconfirmação original é
+                    reenviada do zero para o e-mail corrigido.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email-correto@hotel.com"
+                      value={emailCorrigido}
+                      onChange={(event) => setEmailCorrigido(event.target.value)}
+                    />
+                    <Button size="sm" disabled={enviandoCorrecaoEmail} onClick={corrigirEmailEReenviar}>
+                      {enviandoCorrecaoEmail ? "Enviando..." : "Salvar e reenviar"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
               {envios.length === 0 && !temEmailDisponivel ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/5 p-3">
                   <p className="text-sm text-destructive">

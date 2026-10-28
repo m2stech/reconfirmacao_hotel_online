@@ -6,6 +6,21 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-28 — Correção de e-mail errado do hotel e reenvio no dialog de reserva
+
+Caso real: reserva 7FX157 caiu em REVISAR porque o e-mail cadastrado do hotel (MR Hotel) estava errado — a resposta recebida veio de um domínio/fornecedor diferente (M&R Hotel Management vs. HotelDo nos dados da reserva), sem referência à reserva. Sem como corrigir o e-mail e reenviar pela própria tela, o consultor dependia de replicar manualmente o fluxo de `/hoteis` e depois reenviar por fora.
+
+Novo botão "Corrigir e-mail do hotel" em `ReservationDetailDialog`, ao lado de "Histórico com o hotel" (só aparece quando já há envio registrado). Abre um campo de e-mail que, ao salvar, chama a nova rota `POST /api/reservations/[id]/corrigir-email-e-reenviar`:
+
+- Marca como `obsoleto` todo e-mail ativo (`confirmado` ou `sugerido`) do hotel em `hotel_emails` — evita que o e-mail errado continue sendo usado em outras reservas do mesmo hotel.
+- Insere o e-mail corrigido já como `confirmado` (mesmo nível de confiança de uma correção manual em `/hoteis`); se já existir (unique `hotel_id, email`), reconfirma em vez de duplicar.
+- Reenvia a reconfirmação como um **novo envio original** (`enviarReconfirmacaoInicial`, `tipo: 'reconfirmacao_inicial'`), não como `reenvio` de uma thread — o e-mail errado nem é o mesmo hotel/pessoa, então não faz sentido responder a ele.
+- Zera `reservations.status_manual` para o status automático recalcular a partir do novo `email_send` (view `audit_status` usa sempre o último envio) — a reserva volta para `AGUARDANDO_RESPOSTA` em vez de continuar presa em `REVISAR` por causa da resposta antiga.
+
+O histórico anterior (envio e resposta divergente) continua visível no dialog, sem ser apagado — só deixa de determinar o status atual.
+
+---
+
 ## 2026-10-27 — Scroll no modal de detalhe da reserva
 
 Com o e-mail completo do hotel (melhoria anterior) e sua tradução expandidos, o conteúdo do `ReservationDetailDialog` passou a ultrapassar a altura da tela em respostas longas, cortando o topo (título) e o rodapé (botões Cancelar/Salvar) para fora da área visível — sem como rolar.
