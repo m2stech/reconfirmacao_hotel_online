@@ -6,6 +6,22 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-28 — Correção: cobrança automática (reenvio após 24h) falhava silenciosamente desde 26/10
+
+Usuário notou que uma reserva em AGUARDANDO_RESPOSTA desde 26/10 (>44h) nunca recebeu a cobrança automática esperada (PRD/Milestone 11: lembrete ao hotel após 24h sem resposta, até 3 tentativas — não é "3 dias" como lembrado inicialmente, é 24h por tentativa). Investigação via `vercel logs` (painel de logs do projeto, não a CLI — retenção de runtime logs no plano Hobby é de só 30 min) encontrou o erro real do cron `/api/jobs/cobrar-hoteis`, repetido todo dia desde 26/10:
+
+```
+{ code: '42703', message: 'column audit_status.cobranca_tentativas does not exist' }
+```
+
+Causa: a migration `20261022120000` (Milestone 11) tinha adicionado `cobranca_tentativas`/`cobranca_ultima_em` à view `reconfirmacao.audit_status`. Duas migrations seguintes do mesmo dia 26/10 (`20261026130000` e `20261026140000`, ambas sobre o status `EMAIL_NAO_ENCONTRADO`) recriaram a view (`drop view` + `create view`) a partir de uma cópia anterior ao Milestone 11, regredindo-a sem essas duas colunas — ninguém percebeu porque o erro só aparece em runtime do cron (1x/dia), não em teste/build, e falha silenciosamente sem notificar (erro ocorre antes de qualquer chamada a `notificar()`).
+
+Corrigido com a migration `20261028190000`: recria `audit_status` reincorporando as duas colunas, mantendo a lógica mais recente de `EMAIL_NAO_ENCONTRADO` (qualquer e-mail cadastrado, confirmado ou sugerido). Aplicada diretamente em produção via Supabase Management API (mesmo padrão já usado nas migrations anteriores) — confirmado que a view voltou a ter as colunas e que a query do job roda sem erro. Nenhuma mudança de código em `collection-pending.ts`/`collection.ts` foi necessária; eles já esperavam essas colunas corretamente, só a view estava desatualizada.
+
+**Lição para próximas migrations que recriam `audit_status`:** sempre partir do `SELECT` mais recente da view (não copiar de uma migration anterior) — `drop view` + `create view` não é incremental, qualquer coluna adicionada numa migration intermediária precisa ser replicada manualmente na próxima recriação.
+
+---
+
 ## 2026-10-28 — Correção de e-mail errado do hotel e reenvio no dialog de reserva
 
 Caso real: reserva 7FX157 caiu em REVISAR porque o e-mail cadastrado do hotel (MR Hotel) estava errado — a resposta recebida veio de um domínio/fornecedor diferente (M&R Hotel Management vs. HotelDo nos dados da reserva), sem referência à reserva. Sem como corrigir o e-mail e reenviar pela própria tela, o consultor dependia de replicar manualmente o fluxo de `/hoteis` e depois reenviar por fora.

@@ -32,3 +32,6 @@ supabase/.temp/
 npm-debug.log*
 .vercel
 *.tsbuildinfo
+
+.vercel
+.env*
