@@ -6,16 +6,22 @@ import { enviarReconfirmacaoInicial } from "@/features/email-sends/send";
 
 const bodySchema = z.object({
   email: z.string().trim().email(),
+  pais: z.string().trim().min(1),
 });
 
 /**
- * Corrige o e-mail de contato do hotel (status REVISAR por e-mail errado,
- * ex. resposta vazando de domínio/fornecedor diferente do esperado) e
- * reenvia a reconfirmação original para o e-mail corrigido — não é um
- * `reenvio` de um email_send específico, é um novo ciclo do zero. E-mails
- * ativos anteriores do hotel (confirmado ou sugerido) são marcados como
- * obsoletos para não concorrerem com o novo no próximo envio automático de
- * outras reservas do mesmo hotel.
+ * Corrige o e-mail E o país de contato do hotel (status REVISAR por contato
+ * errado, ex. resposta vazando de domínio/fornecedor diferente do esperado —
+ * sintoma de que o hotel cadastrado é outro, então tanto e-mail quanto país
+ * podem estar errados) e reenvia a reconfirmação original para o e-mail
+ * corrigido — não é um `reenvio` de um email_send específico, é um novo
+ * ciclo do zero. E-mails ativos anteriores do hotel (confirmado ou sugerido)
+ * são marcados como obsoletos para não concorrerem com o novo no próximo
+ * envio automático de outras reservas do mesmo hotel. País corrigido ganha
+ * `pais_fonte: 'manual'`/`pais_a_confirmar: false` (mesmo padrão de
+ * confirmação manual usado em `criarHotel`) — o idioma do e-mail reenviado é
+ * derivado automaticamente do novo país (`idiomaPorPais`, Milestone 7), sem
+ * lógica extra.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,9 +36,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const payload = bodySchema.safeParse(await request.json());
   if (!payload.success) {
-    return NextResponse.json({ ok: false, erro: "E-mail inválido." }, { status: 400 });
+    return NextResponse.json({ ok: false, erro: "E-mail e país são obrigatórios." }, { status: 400 });
   }
-  const email = payload.data.email;
+  const { email, pais } = payload.data;
 
   const { data: reserva, error: erroReserva } = await supabase
     .schema("reconfirmacao")
@@ -49,6 +55,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const hotel = Array.isArray(reserva.hotels) ? reserva.hotels[0] : reserva.hotels;
   if (!reserva.hotel_id || !hotel) {
     return NextResponse.json({ ok: false, erro: "Reserva sem hotel vinculado." }, { status: 400 });
+  }
+
+  const { error: erroPais } = await supabase
+    .schema("reconfirmacao")
+    .from("hotels")
+    .update({ pais, pais_fonte: "manual", pais_a_confirmar: false })
+    .eq("id", reserva.hotel_id);
+  if (erroPais) {
+    return NextResponse.json({ ok: false, erro: "Falha ao corrigir país do hotel." }, { status: 500 });
   }
 
   const { error: erroObsoletar } = await supabase
@@ -99,7 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       fornecedor: reserva.fornecedor,
       hospedes: reserva.hospedes as { nome: string }[],
       hotelNome: hotel.nome,
-      hotelPais: hotel.pais,
+      hotelPais: pais,
       destinatario: email,
     },
     user.id
@@ -129,7 +144,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: "hotel_email_corrected_and_resent",
     entity_type: "reservation",
     entity_id: id,
-    metadata: { localizador: reserva.localizador, novo_email: email },
+    metadata: { localizador: reserva.localizador, novo_email: email, novo_pais: pais, pais_anterior: hotel.pais },
   });
 
   return NextResponse.json({ ok: true, emailSendId: resultado.emailSendId });

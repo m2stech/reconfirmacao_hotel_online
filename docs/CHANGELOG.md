@@ -6,6 +6,16 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-10-29 — Correção de contato do hotel passa a corrigir também o país, não só o e-mail
+
+Caso relatado pelo usuário: quando o hotel cadastrado estava errado por completo (resposta vindo de outro fornecedor/domínio, ex. reserva X263VJ), o botão "Corrigir e-mail do hotel" só permitia trocar o e-mail — mas se o hotel cadastrado é de fato outro, o país também pode estar errado, e o idioma do e-mail (`idiomaPorPais`, derivado de `reconfirmacao.hotels.pais` desde o Milestone 7) seguiria usando o país antigo mesmo após a correção.
+
+- Botão renomeado para "Corrigir e-mail e país do hotel"; formulário (`ReservationDetailDialog`) ganhou um segundo campo de texto para o país, pré-preenchido com o país atual do hotel. Ambos os campos são obrigatórios — a correção sempre pede os dois juntos, mesmo quando só um estava errado (decisão do usuário: menos risco de esquecer de checar o país do que deixá-lo opcional).
+- `POST /api/reservations/[id]/corrigir-email-e-reenviar`: antes de obsoletar/trocar o e-mail, agora também faz `UPDATE` em `reconfirmacao.hotels.pais` (com `pais_fonte: 'manual'`, `pais_a_confirmar: false` — mesmo padrão de confirmação manual já usado em `criarHotel`, Milestone 5). O reenvio da reconfirmação usa o país recém-corrigido (não mais o `hotel.pais` lido antes do update), então o idioma do e-mail já sai correto na mesma chamada, sem lógica de idioma nova — `idiomaPorPais` já fazia esse trabalho.
+- `audit_log` da ação (`hotel_email_corrected_and_resent`) passou a registrar também `novo_pais`/`pais_anterior` em `metadata`.
+
+---
+
 ## 2026-10-29 — Correção: IA confundia HCN informado em texto corrido com "não informado", e status de auditoria escondia pendência atrás de "Não confirmada"
 
 Caso real reportado pelo usuário (localizador 7FX157, MR Hotel): o hotel respondeu "Reserva confirmada bajo el codigo 40399990202", com regime alimentar e pagamento também confirmados em texto corrido (sem usar a sigla "HCN"). Dois problemas:

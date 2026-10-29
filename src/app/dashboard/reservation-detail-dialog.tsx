@@ -85,6 +85,7 @@ export function ReservationDetailDialog({
 
   const [corrigindoEmail, setCorrigindoEmail] = useState(false);
   const [emailCorrigido, setEmailCorrigido] = useState("");
+  const [paisCorrigido, setPaisCorrigido] = useState("");
   const [enviandoCorrecaoEmail, setEnviandoCorrecaoEmail] = useState(false);
 
   const [respondendoId, setRespondendoId] = useState<string | null>(null);
@@ -169,26 +170,27 @@ export function ReservationDetailDialog({
 
   async function corrigirEmailEReenviar() {
     if (!reserva) return;
-    if (!emailCorrigido.trim()) {
-      toast.error("Digite o e-mail correto do hotel.");
+    if (!emailCorrigido.trim() || !paisCorrigido.trim()) {
+      toast.error("Digite o e-mail e o país corretos do hotel.");
       return;
     }
     setEnviandoCorrecaoEmail(true);
     const resposta = await fetch(`/api/reservations/${reserva.id}/corrigir-email-e-reenviar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: emailCorrigido.trim() }),
+      body: JSON.stringify({ email: emailCorrigido.trim(), pais: paisCorrigido.trim() }),
     });
     const dados = await resposta.json();
     setEnviandoCorrecaoEmail(false);
 
     if (!dados.ok) {
-      toast.error(dados.erro ?? "Falha ao corrigir e-mail e reenviar.");
+      toast.error(dados.erro ?? "Falha ao corrigir e-mail/país e reenviar.");
       return;
     }
-    toast.success("E-mail do hotel corrigido e reconfirmação reenviada.");
+    toast.success("E-mail e país do hotel corrigidos e reconfirmação reenviada.");
     setCorrigindoEmail(false);
     setEmailCorrigido("");
+    setPaisCorrigido("");
     await carregarDetalhe();
     onSaved();
   }
@@ -318,9 +320,10 @@ export function ReservationDetailDialog({
                     onClick={() => {
                       setCorrigindoEmail((atual) => !atual);
                       setEmailCorrigido("");
+                      setPaisCorrigido(reserva?.hotels?.pais ?? "");
                     }}
                   >
-                    {corrigindoEmail ? "Cancelar" : "Corrigir e-mail do hotel"}
+                    {corrigindoEmail ? "Cancelar" : "Corrigir e-mail e país do hotel"}
                   </Button>
                 ) : null}
               </div>
@@ -328,9 +331,10 @@ export function ReservationDetailDialog({
               {corrigindoEmail ? (
                 <div className="mb-2 flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-3">
                   <p className="text-xs text-muted-foreground">
-                    Use quando o e-mail cadastrado do hotel está incorreto (ex. resposta de outro
-                    fornecedor/domínio). O e-mail atual é substituído e a reconfirmação original é
-                    reenviada do zero para o e-mail corrigido.
+                    Use quando o contato cadastrado do hotel está incorreto (ex. resposta de outro
+                    fornecedor/domínio — sintoma de hotel errado, e-mail e país podem estar errados
+                    juntos). E-mail e país atuais são substituídos e a reconfirmação original é
+                    reenviada do zero para o e-mail corrigido, no idioma do país corrigido.
                   </p>
                   <div className="flex gap-2">
                     <Input
@@ -338,6 +342,12 @@ export function ReservationDetailDialog({
                       placeholder="email-correto@hotel.com"
                       value={emailCorrigido}
                       onChange={(event) => setEmailCorrigido(event.target.value)}
+                    />
+                    <Input
+                      type="text"
+                      placeholder="País correto"
+                      value={paisCorrigido}
+                      onChange={(event) => setPaisCorrigido(event.target.value)}
                     />
                     <Button size="sm" disabled={enviandoCorrecaoEmail} onClick={corrigirEmailEReenviar}>
                       {enviandoCorrecaoEmail ? "Enviando..." : "Salvar e reenviar"}
