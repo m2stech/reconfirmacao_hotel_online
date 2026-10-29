@@ -163,4 +163,37 @@ export const CASOS_REGRESSAO: CasoRegressao[] = [
     // "divergência" é só o localizador interno nosso vs. o HCN do hotel —
     // não é divergência de negócio real, e deve ser neutralizada.
   },
+  {
+    nome: "texto livre: hotel informa confirmação com código em texto corrido ('bajo el código X') -> REVISAR, nunca NAO_CONFIRMADA",
+    mensagem: mensagemBase({
+      corpoHtmlOuPreview:
+        "<p>Reserva confirmada bajo el codigo 442211. Prepagada. Desayuno incluido. No hay pago de impuestos a pagar.</p>",
+    }),
+    reserva: RESERVA_PADRAO,
+    requerIA: true,
+    // Caso real (localizador 7FX157, 2026-10-28): a IA, antes da correção de
+    // prompt, preenchia reserva_confirmada=NAO e pendencia="HCN não
+    // informado" mesmo tendo extraído o número corretamente — contradição
+    // interna. Este fixture representa a saída CORRETA esperada após a
+    // correção de prompt (src/lib/openai/client.ts): reserva_confirmada=SIM
+    // (hotel confirmou a reserva), com o número extraído e sem pendência de
+    // HCN "não informado" (foi informado, só não com o rótulo literal). A
+    // pendência real aqui é só a ausência de confirmação do regime
+    // alimentar, suficiente para exigir REVISAR.
+    respostaIAMockada: {
+      reserva_confirmada: "SIM",
+      regime_alimentar_confirmado: "INDEFINIDO",
+      numero_confirmacao_hotel: "442211",
+      confirmacoes_multiplas: [],
+      status_pagamento: "PAGO",
+      correspondencia_reserva: "CONFIRMADA",
+      divergencias: [],
+      evidencias_confirmacao: ["Reserva confirmada citando o código 442211, prepaga, café da manhã incluso."],
+      tipo_pendencia: "INFORMACAO_INCOMPLETA",
+      pendencia: "Regime alimentar não confirmado explicitamente pelo hotel.",
+      resumo_resposta: "Hotel confirmou a reserva sob o código 442211, prepaga, com café da manhã incluso.",
+      confianca: 0.75,
+    },
+    esperado: { metodoInterpretacao: "OPENAI", statusInterpretacao: "REVISAR", reservaConfirmada: "SIM" },
+  },
 ];
