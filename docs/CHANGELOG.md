@@ -6,6 +6,19 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-03 — Envio de cópia da reconfirmação ao Broker (fornecedor da reserva)
+
+Pedido novo do usuário: além do hotel, o consultor às vezes precisa mandar cópia da reconfirmação ao Broker (o fornecedor da reserva — `reservations.fornecedor`, ex. Ratehawk, Expedia, HotelDo), para manter o intermediário informado da conferência em andamento.
+
+- Novo botão "Enviar para Broker" em `ReservationDetailDialog`, ao lado de "Corrigir e-mail e país do hotel". Abre um formulário de e-mail/país pré-preenchido com o cadastro existente do broker (se já houver um para aquele fornecedor); salvar dispara `POST /api/reservations/[id]/enviar-para-broker`.
+- Novas tabelas `reconfirmacao.brokers` (1 cadastro por nome de fornecedor, reaproveitado entre reservas — mesmo padrão de `hotels`, mas sem `hotel_emails`/Tavily: e-mail único, sempre manual) e `reconfirmacao.broker_sends` (histórico de envios). Migration `20261103130814`, revisada pelo `supabase-rls-reviewer` sem achados bloqueantes.
+- Decisão de modelagem: `broker_sends` é deliberadamente separada de `email_sends` — não participa de dedup, da constraint `unique(internet_message_id)`, nem do cálculo de `audit_status`/fluxo de leitura de resposta/cobrança automática (tudo isso pressupõe destinatário = hotel). Envio ao broker é ação manual e repetível do consultor, sem bloqueio de reenvio.
+- Conteúdo enviado: cópia como novo e-mail (reaproveita assunto/`corpo_html` já montados e gravados no último `email_sends` da reserva), não um forward real via Graph — mais simples e não depende do `graph_message_id` do envio ao hotel ainda existir/ser aceito pela API.
+- Se o cadastro do broker já existe e o consultor edita e-mail/país no formulário, o cadastro é atualizado (não cria um registro novo nem mantém o valor antigo) — decisão do usuário, mesmo espírito de "Corrigir e-mail e país do hotel".
+- Nova tela `/brokers` (menu "Brokers" no header): lista e permite editar e-mail/país dos brokers cadastrados. Sem criação manual nem merge — um broker só nasce a partir do primeiro envio feito pelo dialog de reserva.
+
+---
+
 ## 2026-10-29 — Correção de contato do hotel passa a corrigir também o país, não só o e-mail
 
 Caso relatado pelo usuário: quando o hotel cadastrado estava errado por completo (resposta vindo de outro fornecedor/domínio, ex. reserva X263VJ), o botão "Corrigir e-mail do hotel" só permitia trocar o e-mail — mas se o hotel cadastrado é de fato outro, o país também pode estar errado, e o idioma do e-mail (`idiomaPorPais`, derivado de `reconfirmacao.hotels.pais` desde o Milestone 7) seguiria usando o país antigo mesmo após a correção.
