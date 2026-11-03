@@ -10,6 +10,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types";
 import { responderHotel } from "@/lib/graph/reply";
+import { idiomaPorPais, type Idioma } from "@/lib/graph/email-template";
 import { registrarEnvio } from "@/features/email-sends/queries";
 import { notificar } from "@/features/notifications/notify";
 import { listarReservasParaCobranca, MAX_TENTATIVAS_COBRANCA, type ReservaElegivelParaCobranca } from "./collection-pending";
@@ -28,17 +29,36 @@ function descreverErro(erro: unknown): string {
   return String(erro);
 }
 
-function textoCobranca(numeroTentativa: number, localizador: string): string {
-  return `Olá, ainda não recebemos sua resposta de reconfirmação da reserva ${localizador}. Esta é a cobrança nº ${numeroTentativa} — pedimos a confirmação o quanto antes para seguirmos com o atendimento.`;
+// Cobrança segue o mesmo idioma do e-mail original (derivado do país do
+// hotel, idiomaPorPais) — corrigido em 2026-11-03: antes o texto e o sufixo
+// do assunto eram fixos em português mesmo para hotéis que receberam a
+// mensagem original em espanhol/inglês (ex. hotel na China → inglês).
+const SUFIXO_COBRANCA: Record<Idioma, (numeroTentativa: number) => string> = {
+  pt: (n) => `cobrança ${n}/${MAX_TENTATIVAS_COBRANCA}`,
+  es: (n) => `reclamo ${n}/${MAX_TENTATIVAS_COBRANCA}`,
+  en: (n) => `reminder ${n}/${MAX_TENTATIVAS_COBRANCA}`,
+};
+
+const TEXTO_COBRANCA: Record<Idioma, (numeroTentativa: number, localizador: string) => string> = {
+  pt: (n, localizador) =>
+    `Olá, ainda não recebemos sua resposta de reconfirmação da reserva ${localizador}. Esta é a cobrança nº ${n} — pedimos a confirmação o quanto antes para seguirmos com o atendimento.`,
+  es: (n, localizador) =>
+    `Hola, todavía no hemos recibido su respuesta de reconfirmación de la reserva ${localizador}. Este es el reclamo nº ${n} — solicitamos la confirmación cuanto antes para continuar con la atención.`,
+  en: (n, localizador) =>
+    `Hello, we have not yet received your reconfirmation reply for reservation ${localizador}. This is reminder nº ${n} — please confirm as soon as possible so we can proceed.`,
+};
+
+function textoCobranca(numeroTentativa: number, localizador: string, idioma: Idioma): string {
+  return TEXTO_COBRANCA[idioma](numeroTentativa, localizador);
 }
 
 // Assunto da cobrança = assunto original da reconfirmação (o mesmo enviado
-// ao hotel na primeira mensagem), só com "- cobrança n/3" ao final — decisão
-// do usuário (2026-11-03): antes era um texto genérico próprio, sem relação
-// visual com o e-mail original, dificultando a identificação pelo hotel.
-function assuntoCobranca(assuntoOriginal: string, numeroTentativa: number): string {
+// ao hotel na primeira mensagem), só com o sufixo de cobrança ao final, no
+// mesmo idioma — decisão do usuário (2026-11-03): antes era um texto
+// genérico próprio, sem relação visual com o e-mail original.
+function assuntoCobranca(assuntoOriginal: string, numeroTentativa: number, idioma: Idioma): string {
   const semPrefixoRe = assuntoOriginal.replace(/^RE:\s*/i, "");
-  return `RE: ${semPrefixoRe} - cobrança ${numeroTentativa}/${MAX_TENTATIVAS_COBRANCA}`;
+  return `RE: ${semPrefixoRe} - ${SUFIXO_COBRANCA[idioma](numeroTentativa)}`;
 }
 
 async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelParaCobranca): Promise<"cobrada" | "esgotada" | "erro"> {
@@ -68,14 +88,16 @@ async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelP
     return "esgotada";
   }
 
-  const novoAssunto = assuntoCobranca(reserva.assuntoOriginal, proximaTentativa);
+  const idioma = idiomaPorPais(reserva.paisHotel);
+  const novoAssunto = assuntoCobranca(reserva.assuntoOriginal, proximaTentativa, idioma);
+  const novoTexto = textoCobranca(proximaTentativa, reserva.localizador, idioma);
 
   const resultado = await responderHotel({
     graphMessageIdOriginal: reserva.graphMessageId,
     internetMessageIdOriginal: reserva.internetMessageId,
     destinatario: reserva.destinatario,
     novoAssunto,
-    textoUsuario: textoCobranca(proximaTentativa, reserva.localizador),
+    textoUsuario: novoTexto,
   });
 
   const agora = new Date().toISOString();
@@ -87,7 +109,7 @@ async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelP
       status: "erro",
       destinatario: reserva.destinatario,
       assunto: novoAssunto,
-      corpo_html: textoCobranca(proximaTentativa, reserva.localizador),
+      corpo_html: novoTexto,
       erro_detalhe: resultado.erro,
     });
 

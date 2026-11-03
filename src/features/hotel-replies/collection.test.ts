@@ -7,6 +7,7 @@ function reservaBase(overrides: Partial<ReservaElegivelParaCobranca> = {}): Rese
     emailSendId: "send-1",
     destinatario: "reservas@hotel.test",
     assuntoOriginal: "Confirmação de reserva - Hotel Teste - Checkin: 15/12/2026",
+    paisHotel: "Brasil",
     graphMessageId: "graph-1",
     internetMessageId: "<envio@snow.test>",
     localizador: "9QGJZN",
@@ -95,6 +96,32 @@ describe("processarLoteDeCobranca", () => {
     );
     expect(updates[0]).toMatchObject({ cobranca_tentativas: 1 });
     expect(notificarMock).not.toHaveBeenCalled();
+  });
+
+  it("usa o idioma do país do hotel na cobrança, não português fixo (caso real: hotel na China)", async () => {
+    const { responderHotelMock, registrarEnvioMock } = await montarAmbiente({
+      elegiveis: [
+        reservaBase({
+          tentativas: 0,
+          paisHotel: "China",
+          assuntoOriginal: "Reservation confirmation - Holiday Inn Zhengzhou - Checkin: 04/11/2026",
+        }),
+      ],
+    });
+
+    const { processarLoteDeCobranca } = await import("./collection");
+    const { fake } = montarSupabaseFake();
+
+    await processarLoteDeCobranca(fake, { limiteReservas: 10 });
+
+    const assuntoEsperado = "RE: Reservation confirmation - Holiday Inn Zhengzhou - Checkin: 04/11/2026 - reminder 1/3";
+    expect(responderHotelMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        novoAssunto: assuntoEsperado,
+        textoUsuario: expect.stringContaining("Hello, we have not yet received"),
+      })
+    );
+    expect(registrarEnvioMock).toHaveBeenCalledWith(fake, expect.objectContaining({ assunto: assuntoEsperado }));
   });
 
   it("não envia, notifica sla_esgotado e grava sentinela quando já atingiu as 3 tentativas", async () => {
