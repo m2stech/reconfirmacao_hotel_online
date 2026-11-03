@@ -223,6 +223,7 @@ export type Database = {
           created_by: string
           id: string
           is_active: boolean
+          product_type: Database["public"]["Enums"]["product_type"]
           version: number
         }
         Insert: {
@@ -231,6 +232,7 @@ export type Database = {
           created_by: string
           id?: string
           is_active?: boolean
+          product_type?: Database["public"]["Enums"]["product_type"]
           version: number
         }
         Update: {
@@ -239,6 +241,7 @@ export type Database = {
           created_by?: string
           id?: string
           is_active?: boolean
+          product_type?: Database["public"]["Enums"]["product_type"]
           version?: number
         }
         Relationships: [
@@ -305,6 +308,7 @@ export type Database = {
           form: Json
           id: string
           pptx_storage_path: string | null
+          product_type: Database["public"]["Enums"]["product_type"]
           start_date: string | null
           status: Database["public"]["Enums"]["quote_status"]
           updated_at: string
@@ -321,6 +325,7 @@ export type Database = {
           form: Json
           id?: string
           pptx_storage_path?: string | null
+          product_type?: Database["public"]["Enums"]["product_type"]
           start_date?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           updated_at?: string
@@ -337,6 +342,7 @@ export type Database = {
           form?: Json
           id?: string
           pptx_storage_path?: string | null
+          product_type?: Database["public"]["Enums"]["product_type"]
           start_date?: string | null
           status?: Database["public"]["Enums"]["quote_status"]
           updated_at?: string
@@ -367,7 +373,13 @@ export type Database = {
       }
     }
     Enums: {
-      attachment_kind: "agency_logo" | "flight_image" | "institutional_logo"
+      attachment_kind:
+        | "agency_logo"
+        | "flight_image"
+        | "institutional_logo"
+        | "cruise_itinerary_image"
+        | "cruise_photo"
+      product_type: "terrestre" | "cruzeiro"
       quote_status: "draft" | "processing" | "done" | "error"
       user_role: "consultant" | "admin"
     }
@@ -377,6 +389,109 @@ export type Database = {
   }
   reconfirmacao: {
     Tables: {
+      broker_sends: {
+        Row: {
+          assunto: string
+          broker_id: string
+          corpo_html: string
+          created_at: string
+          created_by: string | null
+          destinatario: string
+          erro_detalhe: string | null
+          graph_conversation_id: string | null
+          graph_message_id: string | null
+          id: string
+          internet_message_id: string | null
+          reservation_id: string
+          status: Database["reconfirmacao"]["Enums"]["email_send_status"]
+        }
+        Insert: {
+          assunto: string
+          broker_id: string
+          corpo_html: string
+          created_at?: string
+          created_by?: string | null
+          destinatario: string
+          erro_detalhe?: string | null
+          graph_conversation_id?: string | null
+          graph_message_id?: string | null
+          id?: string
+          internet_message_id?: string | null
+          reservation_id: string
+          status: Database["reconfirmacao"]["Enums"]["email_send_status"]
+        }
+        Update: {
+          assunto?: string
+          broker_id?: string
+          corpo_html?: string
+          created_at?: string
+          created_by?: string | null
+          destinatario?: string
+          erro_detalhe?: string | null
+          graph_conversation_id?: string | null
+          graph_message_id?: string | null
+          id?: string
+          internet_message_id?: string | null
+          reservation_id?: string
+          status?: Database["reconfirmacao"]["Enums"]["email_send_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broker_sends_broker_id_fkey"
+            columns: ["broker_id"]
+            isOneToOne: false
+            referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "broker_sends_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "audit_status"
+            referencedColumns: ["reservation_id"]
+          },
+          {
+            foreignKeyName: "broker_sends_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brokers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          nome: string
+          pais: string | null
+          ultima_confirmacao_em: string | null
+          ultima_confirmacao_por: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome: string
+          pais?: string | null
+          ultima_confirmacao_em?: string | null
+          ultima_confirmacao_por?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          nome?: string
+          pais?: string | null
+          ultima_confirmacao_em?: string | null
+          ultima_confirmacao_por?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       email_sends: {
         Row: {
           assunto: string
@@ -791,6 +906,7 @@ export type Database = {
         | "RESPONDIDO_AO_HOTEL"
         | "ERRO_NO_ENVIO"
         | "NAO_CONFIRMADA"
+        | "EMAIL_NAO_ENCONTRADO"
       contact_reliability: "confirmado" | "sugerido" | "obsoleto"
       contact_source: "manual" | "tavily"
       email_send_kind: "reconfirmacao_inicial" | "reenvio" | "resposta_manual"
@@ -924,7 +1040,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      attachment_kind: ["agency_logo", "flight_image", "institutional_logo"],
+      attachment_kind: [
+        "agency_logo",
+        "flight_image",
+        "institutional_logo",
+        "cruise_itinerary_image",
+        "cruise_photo",
+      ],
+      product_type: ["terrestre", "cruzeiro"],
       quote_status: ["draft", "processing", "done", "error"],
       user_role: ["consultant", "admin"],
     },
@@ -939,6 +1062,7 @@ export const Constants = {
         "RESPONDIDO_AO_HOTEL",
         "ERRO_NO_ENVIO",
         "NAO_CONFIRMADA",
+        "EMAIL_NAO_ENCONTRADO",
       ],
       contact_reliability: ["confirmado", "sugerido", "obsoleto"],
       contact_source: ["manual", "tavily"],

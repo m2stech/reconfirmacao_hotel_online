@@ -28,6 +28,9 @@ export async function SiteHeader() {
               <Link href="/hoteis" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
                 Hotéis
               </Link>
+              <Link href="/brokers" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">
+                Brokers
+              </Link>
               {profile?.role === "admin" ? (
                 <>
                   <Link href="/admin/usuarios" className="text-sidebar-foreground/80 transition hover:text-sidebar-foreground">

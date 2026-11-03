@@ -55,6 +55,17 @@ type Envio = {
   hotel_replies: { id: string; recebido_em: string; resumo: string | null; corpo_texto: string }[];
 };
 
+type EnvioBroker = {
+  id: string;
+  status: string;
+  destinatario: string;
+  assunto: string;
+  created_at: string;
+  erro_detalhe?: string | null;
+};
+
+type Broker = { id: string; nome: string; email: string | null; pais: string | null };
+
 export function ReservationDetailDialog({
   reservationId,
   onClose,
@@ -67,8 +78,15 @@ export function ReservationDetailDialog({
   const [carregando, setCarregando] = useState(true);
   const [reserva, setReserva] = useState<Reserva | null>(null);
   const [envios, setEnvios] = useState<Envio[]>([]);
+  const [enviosBroker, setEnviosBroker] = useState<EnvioBroker[]>([]);
+  const [broker, setBroker] = useState<Broker | null>(null);
   const [temEmailDisponivel, setTemEmailDisponivel] = useState(true);
   const [salvando, setSalvando] = useState(false);
+
+  const [enviandoParaBroker, setEnviandoParaBroker] = useState(false);
+  const [emailBroker, setEmailBroker] = useState("");
+  const [paisBroker, setPaisBroker] = useState("");
+  const [enviandoCopiaBroker, setEnviandoCopiaBroker] = useState(false);
 
   const [emailManual, setEmailManual] = useState("");
   const [enviandoEmailManual, setEnviandoEmailManual] = useState(false);
@@ -127,6 +145,8 @@ export function ReservationDetailDialog({
     }
     setReserva(dados.reserva);
     setEnvios(dados.envios);
+    setEnviosBroker(dados.enviosBroker ?? []);
+    setBroker(dados.broker ?? null);
     setTemEmailDisponivel(Boolean(dados.temEmailDisponivel));
     setStatusManual(dados.reserva.status_manual ?? "nenhum");
     setRegimeConfirmado(Boolean(dados.reserva.regime_alimentar_confirmado_manual));
@@ -193,6 +213,30 @@ export function ReservationDetailDialog({
     setPaisCorrigido("");
     await carregarDetalhe();
     onSaved();
+  }
+
+  async function enviarParaBroker() {
+    if (!reserva) return;
+    if (!emailBroker.trim() || !paisBroker.trim()) {
+      toast.error("Digite o e-mail e o país do broker.");
+      return;
+    }
+    setEnviandoCopiaBroker(true);
+    const resposta = await fetch(`/api/reservations/${reserva.id}/enviar-para-broker`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailBroker.trim(), pais: paisBroker.trim() }),
+    });
+    const dados = await resposta.json();
+    setEnviandoCopiaBroker(false);
+
+    if (!dados.ok) {
+      toast.error(dados.erro ?? "Falha ao enviar para o broker.");
+      return;
+    }
+    toast.success("Cópia da reconfirmação enviada ao broker.");
+    setEnviandoParaBroker(false);
+    await carregarDetalhe();
   }
 
   async function reenviar(envioId: string) {
@@ -311,22 +355,87 @@ export function ReservationDetailDialog({
             <Separator />
 
             <div>
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between gap-2">
                 <h3 className="text-sm font-medium">Histórico com o hotel</h3>
-                {envios.length > 0 ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setCorrigindoEmail((atual) => !atual);
-                      setEmailCorrigido("");
-                      setPaisCorrigido(reserva?.hotels?.pais ?? "");
-                    }}
-                  >
-                    {corrigindoEmail ? "Cancelar" : "Corrigir e-mail e país do hotel"}
-                  </Button>
-                ) : null}
+                <div className="flex gap-2">
+                  {reserva.fornecedor ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setEnviandoParaBroker((atual) => !atual);
+                        setEmailBroker(broker?.email ?? "");
+                        setPaisBroker(broker?.pais ?? "");
+                      }}
+                    >
+                      {enviandoParaBroker ? "Cancelar" : "Enviar para Broker"}
+                    </Button>
+                  ) : null}
+                  {envios.length > 0 ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setCorrigindoEmail((atual) => !atual);
+                        setEmailCorrigido("");
+                        setPaisCorrigido(reserva?.hotels?.pais ?? "");
+                      }}
+                    >
+                      {corrigindoEmail ? "Cancelar" : "Corrigir e-mail e país do hotel"}
+                    </Button>
+                  ) : null}
+                </div>
               </div>
+
+              {enviandoParaBroker ? (
+                <div className="mb-2 flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-3">
+                  <p className="text-xs text-muted-foreground">
+                    Envia uma cópia da reconfirmação (mesmo assunto/corpo já enviados ao hotel) para o
+                    broker <strong>{reserva.fornecedor}</strong>. E-mail e país ficam salvos para os
+                    próximos envios a este broker.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="email-correto@broker.com"
+                      value={emailBroker}
+                      onChange={(event) => setEmailBroker(event.target.value)}
+                    />
+                    <Input
+                      type="text"
+                      placeholder="País do broker"
+                      value={paisBroker}
+                      onChange={(event) => setPaisBroker(event.target.value)}
+                    />
+                    <Button size="sm" disabled={enviandoCopiaBroker} onClick={enviarParaBroker}>
+                      {enviandoCopiaBroker ? "Enviando..." : "Salvar e enviar"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+
+              {enviosBroker.length > 0 ? (
+                <div className="mb-2 flex flex-col gap-2">
+                  <h4 className="text-xs font-medium text-muted-foreground">Envios ao Broker</h4>
+                  {enviosBroker.map((envioBroker) => (
+                    <div key={envioBroker.id} className="rounded-lg border border-border p-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">{envioBroker.assunto}</span>
+                        <Badge variant={envioBroker.status === "erro" ? "destructive" : "secondary"}>
+                          {envioBroker.status}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Enviado em {new Date(envioBroker.created_at).toLocaleString("pt-BR")} para{" "}
+                        {envioBroker.destinatario}
+                      </p>
+                      {envioBroker.status === "erro" ? (
+                        <p className="mt-1 text-xs text-destructive">{envioBroker.erro_detalhe}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {corrigindoEmail ? (
                 <div className="mb-2 flex flex-col gap-2 rounded-lg border border-border bg-muted/30 p-3">

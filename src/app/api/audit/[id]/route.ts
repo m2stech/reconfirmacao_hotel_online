@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { STATUS_AUDITORIA, validarStatusManual, type StatusAuditoria } from "@/features/audit/status";
+import { buscarBrokerPorNome } from "@/features/brokers/queries";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -32,6 +33,13 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     .eq("reservation_id", id)
     .order("created_at", { ascending: true });
 
+  const { data: enviosBroker } = await supabase
+    .schema("reconfirmacao")
+    .from("broker_sends")
+    .select("*, brokers(nome, email, pais)")
+    .eq("reservation_id", id)
+    .order("created_at", { ascending: true });
+
   // Qualquer e-mail (confirmado ou sugerido pelo Tavily) já dispara o envio
   // automático — ver migration 20261026140000. "Sem e-mail" só significa
   // nenhuma linha em hotel_emails para o hotel, não ausência de confirmação.
@@ -45,7 +53,16 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     temEmailDisponivel = (count ?? 0) > 0;
   }
 
-  return NextResponse.json({ ok: true, reserva, envios: envios ?? [], temEmailDisponivel });
+  const broker = reserva.fornecedor ? await buscarBrokerPorNome(supabase, reserva.fornecedor) : null;
+
+  return NextResponse.json({
+    ok: true,
+    reserva,
+    envios: envios ?? [],
+    enviosBroker: enviosBroker ?? [],
+    broker,
+    temEmailDisponivel,
+  });
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
