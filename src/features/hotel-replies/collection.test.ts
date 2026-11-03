@@ -6,6 +6,7 @@ function reservaBase(overrides: Partial<ReservaElegivelParaCobranca> = {}): Rese
     reservationId: "res-1",
     emailSendId: "send-1",
     destinatario: "reservas@hotel.test",
+    assuntoOriginal: "Confirmação de reserva - Hotel Teste - Checkin: 15/12/2026",
     graphMessageId: "graph-1",
     internetMessageId: "<envio@snow.test>",
     localizador: "9QGJZN",
@@ -75,7 +76,7 @@ async function montarAmbiente(options: {
 
 describe("processarLoteDeCobranca", () => {
   it("envia cobrança e incrementa o contador quando ainda não atingiu o limite", async () => {
-    const { registrarEnvioMock, notificarMock } = await montarAmbiente({
+    const { responderHotelMock, registrarEnvioMock, notificarMock } = await montarAmbiente({
       elegiveis: [reservaBase({ tentativas: 0 })],
     });
 
@@ -86,7 +87,12 @@ describe("processarLoteDeCobranca", () => {
 
     expect(resumo.cobrancasEnviadas).toBe(1);
     expect(resumo.slaEsgotado).toBe(0);
-    expect(registrarEnvioMock).toHaveBeenCalledWith(fake, expect.objectContaining({ status: "enviado", reservation_id: "res-1" }));
+    const assuntoEsperado = "RE: Confirmação de reserva - Hotel Teste - Checkin: 15/12/2026 - cobrança 1/3";
+    expect(responderHotelMock).toHaveBeenCalledWith(expect.objectContaining({ novoAssunto: assuntoEsperado }));
+    expect(registrarEnvioMock).toHaveBeenCalledWith(
+      fake,
+      expect.objectContaining({ status: "enviado", reservation_id: "res-1", assunto: assuntoEsperado })
+    );
     expect(updates[0]).toMatchObject({ cobranca_tentativas: 1 });
     expect(notificarMock).not.toHaveBeenCalled();
   });

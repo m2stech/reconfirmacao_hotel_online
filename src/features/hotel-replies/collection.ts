@@ -32,6 +32,15 @@ function textoCobranca(numeroTentativa: number, localizador: string): string {
   return `Olá, ainda não recebemos sua resposta de reconfirmação da reserva ${localizador}. Esta é a cobrança nº ${numeroTentativa} — pedimos a confirmação o quanto antes para seguirmos com o atendimento.`;
 }
 
+// Assunto da cobrança = assunto original da reconfirmação (o mesmo enviado
+// ao hotel na primeira mensagem), só com "- cobrança n/3" ao final — decisão
+// do usuário (2026-11-03): antes era um texto genérico próprio, sem relação
+// visual com o e-mail original, dificultando a identificação pelo hotel.
+function assuntoCobranca(assuntoOriginal: string, numeroTentativa: number): string {
+  const semPrefixoRe = assuntoOriginal.replace(/^RE:\s*/i, "");
+  return `RE: ${semPrefixoRe} - cobrança ${numeroTentativa}/${MAX_TENTATIVAS_COBRANCA}`;
+}
+
 async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelParaCobranca): Promise<"cobrada" | "esgotada" | "erro"> {
   const proximaTentativa = reserva.tentativas + 1;
 
@@ -59,11 +68,13 @@ async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelP
     return "esgotada";
   }
 
+  const novoAssunto = assuntoCobranca(reserva.assuntoOriginal, proximaTentativa);
+
   const resultado = await responderHotel({
     graphMessageIdOriginal: reserva.graphMessageId,
     internetMessageIdOriginal: reserva.internetMessageId,
     destinatario: reserva.destinatario,
-    novoAssunto: `RE: Reconfirmação de reserva ${reserva.localizador} — cobrança ${proximaTentativa}/${MAX_TENTATIVAS_COBRANCA}`,
+    novoAssunto,
     textoUsuario: textoCobranca(proximaTentativa, reserva.localizador),
   });
 
@@ -75,7 +86,7 @@ async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelP
       tipo: "reenvio",
       status: "erro",
       destinatario: reserva.destinatario,
-      assunto: `Cobrança ${proximaTentativa}/${MAX_TENTATIVAS_COBRANCA} — ${reserva.localizador}`,
+      assunto: novoAssunto,
       corpo_html: textoCobranca(proximaTentativa, reserva.localizador),
       erro_detalhe: resultado.erro,
     });
@@ -96,7 +107,7 @@ async function cobrarUmaReserva(supabase: TypedClient, reserva: ReservaElegivelP
     tipo: "reenvio",
     status: "enviado",
     destinatario: reserva.destinatario,
-    assunto: `Cobrança ${proximaTentativa}/${MAX_TENTATIVAS_COBRANCA} — ${reserva.localizador}`,
+    assunto: novoAssunto,
     corpo_html: resultado.corpoHtml,
     graph_message_id: resultado.graphMessageId,
     graph_conversation_id: resultado.conversationId,

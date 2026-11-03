@@ -17,6 +17,7 @@ export type ReservaElegivelParaCobranca = {
   reservationId: string;
   emailSendId: string;
   destinatario: string;
+  assuntoOriginal: string;
   graphMessageId: string | null;
   internetMessageId: string | null;
   localizador: string;
@@ -59,7 +60,7 @@ export async function listarReservasParaCobranca(
   const { data: envios, error: erroEnvios } = await supabase
     .schema("reconfirmacao")
     .from("email_sends")
-    .select("id, reservation_id, destinatario, graph_message_id, internet_message_id, created_by")
+    .select("id, reservation_id, destinatario, assunto, graph_message_id, internet_message_id, created_by")
     .in("id", emailSendIds);
   if (erroEnvios) throw erroEnvios;
 
@@ -85,6 +86,7 @@ export async function listarReservasParaCobranca(
       reservationId: reserva.id,
       emailSendId: envio.id,
       destinatario: envio.destinatario,
+      assuntoOriginal: envio.assunto,
       graphMessageId: envio.graph_message_id,
       internetMessageId: envio.internet_message_id,
       localizador: reserva.localizador,
