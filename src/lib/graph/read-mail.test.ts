@@ -63,15 +63,26 @@ describe("buscarMensagensDaConversa", () => {
     expect(resultado[0].id).toBe("msg-1");
   });
 
-  it("filtra fora mensagem cujo remetente não é o destinatário do envio (ex: nossa própria cópia em Sent Items)", async () => {
+  it("filtra fora mensagem que veio da nossa própria caixa (ex: nossa cópia em Sent Items ou resposta manual do consultor)", async () => {
     vi.stubGlobal(
       "fetch",
-      mockGraphFetch([mensagemBruta({ from: { emailAddress: { address: "consultor@snow.test" } } })])
+      mockGraphFetch([mensagemBruta({ from: { emailAddress: { address: "teste@exemplo.test" } } })])
     );
     const { buscarMensagensDaConversa } = await import("./read-mail");
 
     const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
     expect(resultado).toHaveLength(0);
+  });
+
+  it("mantém a correspondência quando o hotel responde de um endereço diferente do destinatário original, mas com conversationId igual (casos reais C5X24S/Hilton e 9D15X7/Sofitel, 2026-11-04: hotel respondeu de atendente específico em vez da caixa genérica para a qual enviamos)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockGraphFetch([mensagemBruta({ from: { emailAddress: { address: "atendente.especifico@hotel.test" } } })])
+    );
+    const { buscarMensagensDaConversa } = await import("./read-mail");
+
+    const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
+    expect(resultado).toHaveLength(1);
   });
 
   it("filtra fora mensagem anterior à data de envio", async () => {

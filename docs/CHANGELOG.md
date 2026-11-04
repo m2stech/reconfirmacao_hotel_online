@@ -6,6 +6,19 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-04 — Correção: resposta de hotel vinda de remetente diferente do destinatário do envio não era capturada
+
+Segundo caso do mesmo dia (reservas C5X24S — Hilton Orlando Buena Vista Palace - Disney Springs Area — e 9D15X7 — Sofitel Marrakech Palais Imperial & Spa), reportado pelo usuário logo após o fix do `conversationId` acima. Mesmo sintoma (consultor via a resposta na caixa `produtos1@bvgroup.com.br`, sistema não registrava nada), causa raiz diferente.
+
+**Causa raiz** em `mensagemCorresponde` (`src/lib/graph/read-mail.ts`): a função exigia que o remetente da mensagem recebida fosse **exatamente igual** ao destinatário do envio original (`mensagem.remetente !== destinatarioHotel` → descarta). Em ambos os casos o e-mail foi enviado para um endereço genérico do hotel (`MCOBU_RES@hilton.com`, `H3569@sofitel.com`), mas a resposta chegou da caixa pessoal de um atendente (`Ryan.Wilkinson@Hilton.com`, `Zineb.RAJA@sofitel.com`) — com `conversationId`/`In-Reply-To` batendo perfeitamente com o envio original. A checagem de remetente reprovava a mensagem antes mesmo de avaliar conversationId ou in-reply-to, que é quem deveria decidir a correspondência.
+
+- Corrigido: a checagem de remetente agora só exclui mensagens que vieram da **nossa própria caixa** (`caixaAutorizada()`, `produtos1@bvgroup.com.br`) — que era o propósito original do filtro (não processar nossa própria cópia enviada ou respostas manuais do consultor na mesma thread) — em vez de exigir igualdade com o destinatário do envio.
+- Teste de regressão existente sobre "filtra nossa própria mensagem" foi ajustado para refletir a regra nova (remetente = caixa autorizada, não mais remetente ≠ destinatário). Novo teste cobrindo o caso real: hotel responde de um endereço diferente do destinatário original, com `conversationId` igual.
+- **Correção retroativa:** as duas mensagens (Hilton recebida 2026-11-03T21:09:48Z, Sofitel recebida 2026-11-04T13:17:59Z) foram localizadas via Graph e reprocessadas pelo fluxo normal de produção, script `src/lib/jobs/__integration__/reprocessar-c5x24s-9d15x7.manual.ts`, registrado em `audit_log`. Resultado: C5X24S (Hilton) confirmada pelo hotel (nº 3104525797) mas regime alimentar/pagamento não informados na resposta → status `REVISAR`; 9D15X7 (Sofitel) confirmada com HCN QSRDMBBZ e regime alimentar confirmado → status `CONFIRMADA`.
+- Com os dois bugs de captura de resposta corrigidos no mesmo dia (conversationId divergente + remetente divergente), vale continuar observando por mais alguns dias se surgem novos casos de "resposta vista na caixa mas ausente no sistema" — mas a cobertura dos padrões conhecidos de threading quebrado (helpdesk de terceiros e atendente individual respondendo por endereço genérico) está fechada.
+
+---
+
 ## 2026-11-04 — Correção: resposta de hotel com `conversationId` diferente do original não era capturada
 
 Caso reportado pelo usuário (reserva XYBZ9J, Universal's Endless Summer Resort - Dockside Inn and Suites): o consultor viu, pela própria caixa `produtos1@bvgroup.com.br`, que o hotel havia respondido à reconfirmação — mas o dialog da reserva no sistema só mostrava o envio original, sem nenhuma resposta na thread.

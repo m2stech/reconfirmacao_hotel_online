@@ -73,13 +73,19 @@ export type EnvioParaBuscaDeResposta = {
 };
 
 /**
- * Uma resposta só é do hotel se o remetente for exatamente o destinatário
- * para quem enviamos — /me/messages também devolve nossas próprias
- * mensagens da conversa (original e respostas manuais).
+ * Uma resposta só é do hotel se não vier da nossa própria caixa — /me/messages
+ * também devolve nossas próprias mensagens da conversa (original e respostas
+ * manuais do consultor). Não exigimos que o remetente seja exatamente o
+ * destinatário do envio: casos reais (C5X24S/Hilton, 9D15X7/Sofitel,
+ * 2026-11-04) mostram hotéis respondendo de um atendente específico
+ * (ex. Ryan.Wilkinson@Hilton.com) em vez do endereço genérico para o qual
+ * mandamos (ex. MCOBU_RES@hilton.com), com conversationId/in-reply-to
+ * corretos — exigir igualdade estrita descartava essas respostas antes de
+ * avaliar conversationId/in-reply-to.
  */
 function mensagemCorresponde(mensagem: MensagemGraph, envio: EnvioParaBuscaDeResposta): boolean {
-  const destinatarioHotel = envio.destinatario.toLowerCase();
-  if (!mensagem.remetente || !destinatarioHotel || mensagem.remetente !== destinatarioHotel) return false;
+  const nossaCaixa = caixaAutorizada().toLowerCase();
+  if (!mensagem.remetente || mensagem.remetente === nossaCaixa) return false;
 
   if (envio.conversationId && mensagem.conversationId === envio.conversationId) return true;
 
