@@ -6,6 +6,19 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-04 — Correção: resposta de hotel com `conversationId` diferente do original não era capturada
+
+Caso reportado pelo usuário (reserva XYBZ9J, Universal's Endless Summer Resort - Dockside Inn and Suites): o consultor viu, pela própria caixa `produtos1@bvgroup.com.br`, que o hotel havia respondido à reconfirmação — mas o dialog da reserva no sistema só mostrava o envio original, sem nenhuma resposta na thread.
+
+**Causa raiz** em `buscarMensagensDaConversa` (`src/lib/graph/read-mail.ts`): quando o envio tinha `conversationId` registrado (sempre tem), a *query feita ao Graph* já filtrava por `conversationId eq '...'` antes de baixar qualquer mensagem. A resposta real da reserva XYBZ9J chegou em `produtos1@bvgroup.com.br` com o header RFC `In-Reply-To` apontando corretamente para a mensagem original, mas com um `conversationId` **novo** — o remetente (`guestservices@universalorlando.com`, atendimento central da Universal Orlando, não o hotel) é respondido por um sistema de helpdesk (Salesforce, domínio `sfdc.net`) que não preserva o threading nativo do Exchange. O `$filter` por `conversationId` descartava essa mensagem antes dela sequer chegar a `mensagemCorresponde()`, que já tinha lógica de fallback por `in-reply-to`/`references`/assunto — só que esse fallback nunca rodava de fato quando `conversationId` estava preenchido, porque a mensagem já tinha sido excluída na chamada à API.
+
+- Corrigido: a query ao Graph agora sempre filtra só por janela de tempo (`receivedDateTime ge <data do envio>`), igual ao que já era o comportamento quando não havia `conversationId`. Toda a correlação real (conversationId, in-reply-to/references, ou assunto) passa a ser sempre avaliada em memória por `mensagemCorresponde()`, como já era a intenção original do código.
+- Novo teste de regressão em `src/lib/graph/read-mail.test.ts` reproduzindo o caso (conversationId do envio diferente do da resposta, correspondência só por `In-Reply-To`).
+- **Correção retroativa do dado já perdido:** a mensagem (recebida em `produtos1@bvgroup.com.br` às 2026-11-04T00:42:11Z) foi localizada diretamente via Graph API e reprocessada com o fluxo normal de produção (`interpretarResposta` + `persistirInterpretacao`), script `src/lib/jobs/__integration__/reprocessar-xybz9j.manual.ts`, registrado em `audit_log` (`action: 'correcao_captura_resposta_nao_registrada'`). A interpretação da IA (chamada real, PRD §7.2) resultou em `REVISAR`: a mensagem é do atendimento central da Universal Orlando (não do hotel), que orienta contatar o hotel direto em `CustomerService@esdockside.com` — não confirma nem recusa a reserva. Ação pendente do consultor: usar "Corrigir e-mail e país do hotel" para trocar o contato cadastrado e reenviar.
+- Esse `conversationId` divergente provavelmente afeta qualquer hotel cujo contato cadastrado seja uma central de atendimento genérica que reencaminha por um sistema de terceiros em vez de responder direto pelo Exchange/Outlook do hotel — não é exclusivo da Universal Orlando. Vale observar se outras reservas têm o mesmo padrão de "resposta vista pelo consultor na caixa mas ausente no sistema" após este fix entrar em produção.
+
+---
+
 ## 2026-11-03 — Envio de cópia da reconfirmação ao Broker (fornecedor da reserva)
 
 Pedido novo do usuário: além do hotel, o consultor às vezes precisa mandar cópia da reconfirmação ao Broker (o fornecedor da reserva — `reservations.fornecedor`, ex. Ratehawk, Expedia, HotelDo), para manter o intermediário informado da conferência em andamento.

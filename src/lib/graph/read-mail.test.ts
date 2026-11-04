@@ -101,6 +101,22 @@ describe("buscarMensagensDaConversa", () => {
     expect(resultado).toHaveLength(1);
   });
 
+  it("mantém a correspondência por in-reply-to mesmo quando o envio tem conversationId e a resposta chega com um conversationId diferente (caso real XYBZ9J: helpdesk Salesforce não preserva threading do Exchange)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockGraphFetch([
+        mensagemBruta({
+          conversationId: "conv-outra-gerada-pelo-helpdesk",
+          internetMessageHeaders: [{ name: "In-Reply-To", value: "<envio-original@snow.test>" }],
+        }),
+      ])
+    );
+    const { buscarMensagensDaConversa } = await import("./read-mail");
+
+    const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
+    expect(resultado).toHaveLength(1);
+  });
+
   it("ordena mensagens por data de recebimento ascendente", async () => {
     vi.stubGlobal(
       "fetch",

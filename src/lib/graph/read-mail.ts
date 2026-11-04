@@ -115,13 +115,17 @@ export async function buscarMensagensDaConversa(
   const caixa = caixaAutorizada();
   const params = new URLSearchParams({ $select: CAMPOS_GRAPH, $top: "50" });
 
-  if (envio.conversationId) {
-    params.set("$filter", `conversationId eq '${envio.conversationId.replace(/'/g, "''")}'`);
-  } else {
-    const dataEnvio = new Date(envio.dataEnvio);
-    if (!Number.isNaN(dataEnvio.getTime())) {
-      params.set("$filter", `receivedDateTime ge ${dataEnvio.toISOString().replace(/\.\d{3}Z$/, "Z")}`);
-    }
+  // Filtro sempre por janela de tempo, nunca por conversationId: alguns
+  // hotéis respondem de um sistema (helpdesk/Salesforce etc.) que não
+  // preserva o conversationId do Exchange, só o header RFC In-Reply-To —
+  // caso real da reserva XYBZ9J (2026-11-04), resposta da Universal Orlando
+  // via sfdc.net chegou com conversationId novo mas In-Reply-To correto.
+  // Um $filter por conversationId na própria query ao Graph descartaria
+  // essa mensagem antes dela chegar a mensagemCorresponde(), que é quem
+  // sabe avaliar o fallback por in-reply-to/references/assunto.
+  const dataEnvio = new Date(envio.dataEnvio);
+  if (!Number.isNaN(dataEnvio.getTime())) {
+    params.set("$filter", `receivedDateTime ge ${dataEnvio.toISOString().replace(/\.\d{3}Z$/, "Z")}`);
   }
 
   const resposta = await graphFetch(`/users/${caixa}/messages?${params.toString()}`);
