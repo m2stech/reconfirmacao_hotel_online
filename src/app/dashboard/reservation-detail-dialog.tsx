@@ -23,6 +23,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { STATUS_LABEL, STATUS_MANUAL_OPCOES, validarStatusManual, type StatusAuditoria } from "@/features/audit/status";
+import { baixarRespostaComoPdf } from "@/features/hotel-replies/export-pdf";
 
 type Hospede = { nome: string };
 
@@ -499,7 +500,13 @@ export function ReservationDetailDialog({
                       {envio.status === "erro" ? (
                         <p className="mt-1 text-xs text-destructive">{envio.erro_detalhe}</p>
                       ) : null}
-                      {envio.hotel_replies.map((resposta, indice) => (
+                      {envio.hotel_replies.map((resposta, indice) => {
+                        const respostaMaisRecenteId = envio.hotel_replies.reduce((maisRecente, atual) =>
+                          new Date(atual.recebido_em) > new Date(maisRecente.recebido_em) ? atual : maisRecente
+                        ).id;
+                        const ehMaisRecente = resposta.id === respostaMaisRecenteId;
+
+                        return (
                         <div key={indice} className="mt-1 rounded bg-muted/50 p-2 text-xs">
                           <p className="font-medium">
                             Resposta em {new Date(resposta.recebido_em).toLocaleString("pt-BR")}
@@ -532,8 +539,29 @@ export function ReservationDetailDialog({
                               </div>
                             </details>
                           ) : null}
+                          {ehMaisRecente ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2"
+                              onClick={() =>
+                                reserva &&
+                                baixarRespostaComoPdf({
+                                  reserva,
+                                  resposta,
+                                  textoExibido:
+                                    mostrandoTraducaoId[resposta.id] && traducoes[resposta.id]
+                                      ? traducoes[resposta.id]
+                                      : resposta.corpo_texto,
+                                })
+                              }
+                            >
+                              Baixar PDF
+                            </Button>
+                          ) : null}
                         </div>
-                      ))}
+                        );
+                      })}
 
                       <div className="mt-2 flex gap-2">
                         {envio.status === "erro" ? (
