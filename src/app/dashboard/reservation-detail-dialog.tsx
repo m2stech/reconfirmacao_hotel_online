@@ -511,7 +511,7 @@ export function ReservationDetailDialog({
                                 Ver e-mail completo do hotel
                               </summary>
                               <div className="mt-1 rounded border border-border bg-background p-2">
-                                <p className="whitespace-pre-wrap">
+                                <p className="whitespace-pre-wrap leading-relaxed">
                                   {mostrandoTraducaoId[resposta.id] && traducoes[resposta.id]
                                     ? traducoes[resposta.id]
                                     : resposta.corpo_texto}
