@@ -418,7 +418,9 @@ export function ReservationDetailDialog({
               {enviosBroker.length > 0 ? (
                 <div className="mb-2 flex flex-col gap-2">
                   <h4 className="text-xs font-medium text-muted-foreground">Envios ao Broker</h4>
-                  {enviosBroker.map((envioBroker) => (
+                  {[...enviosBroker]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((envioBroker) => (
                     <div key={envioBroker.id} className="rounded-lg border border-border p-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{envioBroker.assunto}</span>
@@ -488,7 +490,9 @@ export function ReservationDetailDialog({
                 <p className="text-sm text-muted-foreground">Nenhum e-mail enviado ainda.</p>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {envios.map((envio) => (
+                  {[...envios]
+                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                    .map((envio) => (
                     <div key={envio.id} className="rounded-lg border border-border p-2 text-sm">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">{envio.assunto}</span>
