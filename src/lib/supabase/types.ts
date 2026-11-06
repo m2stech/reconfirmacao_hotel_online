@@ -866,6 +866,7 @@ export type Database = {
           cobranca_ultima_em: string | null
           data_checkin: string | null
           data_checkout: string | null
+          first_email_send_at: string | null
           hotel_id: string | null
           hotel_nome: string | null
           last_email_send_at: string | null

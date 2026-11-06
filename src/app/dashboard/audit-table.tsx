@@ -31,6 +31,7 @@ export type AuditRow = {
   data_checkin: string | null;
   data_checkout: string | null;
   status: string | null;
+  first_email_send_at: string | null;
   last_email_send_at: string | null;
   last_hotel_reply_at: string | null;
   pagamento_manual: string | null;
@@ -156,6 +157,7 @@ export function AuditTable() {
               <TableHead>Hotel</TableHead>
               <TableHead>Check-in</TableHead>
               <TableHead>Check-out</TableHead>
+              <TableHead>Primeiro envio</TableHead>
               <TableHead>Último envio</TableHead>
               <TableHead>Última resposta</TableHead>
             </TableRow>
@@ -163,13 +165,13 @@ export function AuditTable() {
           <TableBody>
             {carregando ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   Carregando...
                 </TableCell>
               </TableRow>
             ) : linhas.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   Nenhuma reserva encontrada.
                 </TableCell>
               </TableRow>
@@ -189,6 +191,7 @@ export function AuditTable() {
                   <TableCell>{linha.hotel_nome ?? "—"}</TableCell>
                   <TableCell>{linha.data_checkin ?? "—"}</TableCell>
                   <TableCell>{linha.data_checkout ?? "—"}</TableCell>
+                  <TableCell>{linha.first_email_send_at ? new Date(linha.first_email_send_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
                   <TableCell>{linha.last_email_send_at ? new Date(linha.last_email_send_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
                   <TableCell>{linha.last_hotel_reply_at ? new Date(linha.last_hotel_reply_at).toLocaleDateString("pt-BR") : "—"}</TableCell>
                 </TableRow>

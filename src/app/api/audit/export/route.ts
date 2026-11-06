@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
     "Regime alimentar confirmado": linha.regime_alimentar_confirmado === null ? "" : linha.regime_alimentar_confirmado ? "Sim" : "Não",
     Pagamento: linha.pagamento_manual ?? "",
     "Tipo de pendência": linha.tipo_pendencia_manual ?? "",
+    "Primeiro envio em": linha.first_email_send_at ?? "",
     "Último envio em": linha.last_email_send_at ?? "",
     "Última resposta em": linha.last_hotel_reply_at ?? "",
   }));
