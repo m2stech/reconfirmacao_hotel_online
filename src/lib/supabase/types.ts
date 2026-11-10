@@ -965,6 +965,20 @@ export type Database = {
       }
     }
     Views: {
+      audit_log_detalhado: {
+        Row: {
+          action: string | null
+          actor_email: string | null
+          actor_id: string | null
+          actor_nome: string | null
+          created_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          metadata: Json | null
+        }
+        Relationships: []
+      }
       audit_status: {
         Row: {
           auditoria_atualizada_em: string | null
