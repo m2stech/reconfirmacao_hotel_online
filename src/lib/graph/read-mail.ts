@@ -107,6 +107,47 @@ function mensagemEPosterior(mensagem: MensagemGraph, envio: EnvioParaBuscaDeResp
   return recebido >= enviado;
 }
 
+// Teto de segurança para a paginação abaixo: evita loop extenso/custo
+// descontrolado se a caixa autorizada acumular um volume anormal de
+// mensagens na janela de tempo de uma única reserva (ex. bug em outro
+// lugar inundando a caixa). 1000 mensagens já é uma folga generosa frente
+// ao volume real observado (dezenas a poucas centenas por dia).
+const LIMITE_PAGINAS_BUSCA_MENSAGENS = 20;
+
+/**
+ * Busca todas as páginas de `/messages` a partir da URL inicial, seguindo
+ * `@odata.nextLink` até esgotar ou atingir o teto de segurança.
+ *
+ * Corrige bug real descoberto em produção (2026-11-10, reservas 4PPZGW e
+ * B6CZXS): a busca parava sempre no primeiro `$top=50` sem paginar. Com o
+ * volume de reservas processadas por dia, a resposta real de um hotel podia
+ * cair facilmente fora da primeira página — nesse caso `mensagemCorresponde`
+ * nunca chegava a avaliar a mensagem (ela nem saía do Graph), não importa se
+ * conversationId/in-reply-to/assunto bateriam. Confirmado nos dois casos:
+ * ambas as respostas reais existiam na caixa, com correlação válida, mas
+ * ficaram em páginas seguintes que nunca eram buscadas.
+ */
+async function buscarTodasAsPaginas(urlInicial: string): Promise<MensagemGraphBruta[]> {
+  const mensagens: MensagemGraphBruta[] = [];
+  let proximaUrl: string | null = urlInicial;
+  let paginas = 0;
+
+  while (proximaUrl && paginas < LIMITE_PAGINAS_BUSCA_MENSAGENS) {
+    const resposta: Response = await graphFetch(proximaUrl);
+    if (!resposta.ok) {
+      const corpo = await resposta.text();
+      throw new Error(`Falha ao buscar mensagens (HTTP ${resposta.status}): ${corpo}`);
+    }
+
+    const dados = (await resposta.json()) as { value?: MensagemGraphBruta[]; "@odata.nextLink"?: string };
+    mensagens.push(...(dados.value ?? []));
+    proximaUrl = dados["@odata.nextLink"] ?? null;
+    paginas += 1;
+  }
+
+  return mensagens;
+}
+
 /**
  * Busca mensagens novas de um hotel numa conversa já registrada, filtrando
  * fora as nossas próprias mensagens, mensagens anteriores ao envio e
@@ -134,14 +175,8 @@ export async function buscarMensagensDaConversa(
     params.set("$filter", `receivedDateTime ge ${dataEnvio.toISOString().replace(/\.\d{3}Z$/, "Z")}`);
   }
 
-  const resposta = await graphFetch(`/users/${caixa}/messages?${params.toString()}`);
-  if (!resposta.ok) {
-    const corpo = await resposta.text();
-    throw new Error(`Falha ao buscar mensagens (HTTP ${resposta.status}): ${corpo}`);
-  }
-
-  const dados = (await resposta.json()) as { value?: MensagemGraphBruta[] };
-  const mensagens = (dados.value ?? []).map(normalizarMensagem);
+  const mensagensBrutas = await buscarTodasAsPaginas(`/users/${caixa}/messages?${params.toString()}`);
+  const mensagens = mensagensBrutas.map(normalizarMensagem);
 
   return mensagens
     .filter((mensagem) => mensagemCorresponde(mensagem, envio))

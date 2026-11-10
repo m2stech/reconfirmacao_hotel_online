@@ -47,10 +47,15 @@ export type GraphRequestInit = Omit<RequestInit, "headers"> & { headers?: Record
  * Chamada autenticada à Graph API em nome da caixa configurada em
  * `MS_GRAPH_AUTHORIZED_EMAIL` — nunca conta individual de consultor
  * (CLAUDE.md, requisito mandatório do cliente Snow).
+ *
+ * `path` aceita tanto um caminho relativo (`/users/...`) quanto uma URL
+ * absoluta já completa — necessário para seguir `@odata.nextLink` de
+ * paginação, que a própria Graph API devolve como URL absoluta.
  */
 export async function graphFetch(path: string, init: GraphRequestInit = {}): Promise<Response> {
   const accessToken = await obterAccessToken();
-  return fetch(`${GRAPH_BASE_URL}${path}`, {
+  const url = path.startsWith("http") ? path : `${GRAPH_BASE_URL}${path}`;
+  return fetch(url, {
     ...init,
     headers: {
       Authorization: `Bearer ${accessToken}`,

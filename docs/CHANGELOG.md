@@ -6,6 +6,19 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-10 — Correção: busca de resposta ao Graph não paginava, perdendo respostas fora da primeira página
+
+Segunda rodada de "resposta vista na caixa pelo consultor mas ausente no sistema" (mesma classe de reclamação dos dois casos de 2026-11-04, mas causa raiz diferente e mais grave). Reportado pelo usuário (consultora Evelyn Travassos): duas reservas importadas e enviadas no dia anterior (4PPZGW — Grand Palladium Imbassaí Resort & Spa; B6CZXS — NH Collection Amsterdam Barbizon Palace) receberam resposta do hotel sem nenhum reflexo no dashboard, ~1h45 depois de recebidas.
+
+**Causa raiz** em `buscarMensagensDaConversa` (`src/lib/graph/read-mail.ts`): a busca ao Graph usava só `$top=50` por janela de tempo (desde o envio), sem seguir `@odata.nextLink`. Diferente dos dois bugs de 04/11 (threading quebrado — conversationId/remetente divergente), aqui a correlação em si era válida nos dois casos: 4PPZGW tinha o mesmo `conversationId` do envio; B6CZXS tinha `conversationId` novo (resposta via sistema de ticket da Minor Hotels, repassada por Amazon SES), mas o assunto continha o assunto original como substring, batendo no fallback já existente. O problema é que nenhuma das duas mensagens chegava a ser avaliada por `mensagemCorresponde()` — elas estavam em páginas seguintes do resultado, nunca buscadas. Com o volume real de tráfego da caixa `produtos1@bvgroup.com.br` (múltiplas reservas enviadas/respondidas por dia), 50 mensagens já não cobrem mais uma janela de ~24h — confirmado nos dois casos reais via Graph API (a mensagem relevante ficava fora do primeiro lote de 50, em ambos).
+
+- Corrigido: nova função `buscarTodasAsPaginas` segue `@odata.nextLink` até esgotar, com teto de segurança de 20 páginas (até 1000 mensagens) para não entrar em loop/custo descontrolado se a caixa acumular volume anormal. `graphFetch` (`src/lib/graph/client.ts`) passou a aceitar URL absoluta além de path relativo, necessário para repassar o `nextLink` (que já vem completo da API).
+- Dois novos testes de regressão em `src/lib/graph/read-mail.test.ts`: mensagem correspondente encontrada numa página seguinte; teto de segurança não entra em loop infinito se `@odata.nextLink` nunca parar.
+- **Correção retroativa:** as duas mensagens (Palladium recebida 2026-11-10T17:10:36Z, NH Collection recebida 2026-11-10T16:52:03Z) foram localizadas via Graph (com o fix já aplicado) e reprocessadas pelo fluxo normal de produção, script `src/lib/jobs/__integration__/reprocessar-4ppzgw-b6czxs.manual.ts`, registrado em `audit_log`. Resultado: ambas em `REVISAR` — 4PPZGW com número de confirmação do hotel mas sem confirmação explícita de reserva/regime; B6CZXS com o hotel confirmando reserva ativa mas pedindo contato com o broker (HotelDo), por ter sido feita via terceiro.
+- Esse é o terceiro padrão de "resposta não capturada" identificado em menos de uma semana, e o mais estrutural dos três: os dois primeiros exigiam um tipo específico de quebra de threading (helpdesk de terceiro, atendente respondendo por e-mail individual); este afeta qualquer resposta, de qualquer hotel, bastando volume suficiente na caixa no dia. Como o usuário já sinalizou que a recorrência tende a aumentar, vale observar nas próximas semanas se o teto de 20 páginas chega a ser atingido em produção (sinal de volume diário muito acima do esperado) e se surgem novos padrões de perda de resposta além dos três já mapeados.
+
+---
+
 ## 2026-11-04 — Correção: resposta de hotel vinda de remetente diferente do destinatário do envio não era capturada
 
 Segundo caso do mesmo dia (reservas C5X24S — Hilton Orlando Buena Vista Palace - Disney Springs Area — e 9D15X7 — Sofitel Marrakech Palais Imperial & Spa), reportado pelo usuário logo após o fix do `conversationId` acima. Mesmo sintoma (consultor via a resposta na caixa `produtos1@bvgroup.com.br`, sistema não registrava nada), causa raiz diferente.

@@ -40,6 +40,30 @@ function mockGraphFetch(mensagens: ReturnType<typeof mensagemBruta>[]) {
     .mockResolvedValueOnce(new Response(JSON.stringify({ value: mensagens }), { status: 200 }));
 }
 
+/**
+ * Mock de múltiplas páginas via `@odata.nextLink`, para testar a paginação
+ * de `buscarMensagensDaConversa` (bug real corrigido em 2026-11-10: a busca
+ * parava sempre na 1ª página de $top=50, então uma resposta que chegasse
+ * depois disso nunca era avaliada por mensagemCorresponde, mesmo com
+ * correlação válida).
+ */
+function mockGraphFetchPaginado(paginas: ReturnType<typeof mensagemBruta>[][]) {
+  const mockFetch = vi.fn().mockResolvedValueOnce(
+    new Response(JSON.stringify({ access_token: "fake-token", expires_in: 3599 }), { status: 200 })
+  );
+
+  paginas.forEach((pagina, indice) => {
+    const temProxima = indice < paginas.length - 1;
+    const corpo: Record<string, unknown> = { value: pagina };
+    if (temProxima) {
+      corpo["@odata.nextLink"] = `https://graph.microsoft.com/v1.0/users/teste@exemplo.test/messages?$skip=${indice + 1}`;
+    }
+    mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(corpo), { status: 200 }));
+  });
+
+  return mockFetch;
+}
+
 describe("buscarMensagensDaConversa", () => {
   beforeEach(() => {
     process.env.MS_GRAPH_TENANT_ID = "tenant-fake";
@@ -126,6 +150,44 @@ describe("buscarMensagensDaConversa", () => {
 
     const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
     expect(resultado).toHaveLength(1);
+  });
+
+  it("segue @odata.nextLink e encontra a mensagem correspondente numa página seguinte (casos reais 4PPZGW e B6CZXS, 2026-11-10: a resposta do hotel caiu fora da 1ª página de 50 mensagens, com o volume de tráfego real da caixa)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockGraphFetchPaginado([
+        [mensagemBruta({ id: "outra-msg", internetMessageId: "<outra@qualquer.test>", conversationId: "conv-de-outra-reserva", subject: "Assunto de outra reserva qualquer" })],
+        [mensagemBruta({ id: "msg-pagina-2" })],
+      ])
+    );
+    const { buscarMensagensDaConversa } = await import("./read-mail");
+
+    const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
+    expect(resultado).toHaveLength(1);
+    expect(resultado[0].id).toBe("msg-pagina-2");
+  });
+
+  it("respeita o teto de segurança de páginas e não entra em loop infinito se @odata.nextLink nunca parar", async () => {
+    const mockFetch = vi.fn().mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: "fake-token", expires_in: 3599 }), { status: 200 })
+    );
+    // Sempre retorna nextLink, simulando uma caixa com volume anormal/infinito.
+    mockFetch.mockImplementation(async () =>
+      new Response(
+        JSON.stringify({
+          value: [],
+          "@odata.nextLink": "https://graph.microsoft.com/v1.0/users/teste@exemplo.test/messages?$skip=next",
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", mockFetch);
+    const { buscarMensagensDaConversa } = await import("./read-mail");
+
+    const resultado = await buscarMensagensDaConversa(envioBase(), new Set());
+    expect(resultado).toHaveLength(0);
+    // 1 chamada de token + no máximo 20 páginas (LIMITE_PAGINAS_BUSCA_MENSAGENS).
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(21);
   });
 
   it("ordena mensagens por data de recebimento ascendente", async () => {
