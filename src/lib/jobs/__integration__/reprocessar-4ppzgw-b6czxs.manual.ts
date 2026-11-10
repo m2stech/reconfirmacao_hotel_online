@@ -67,7 +67,7 @@ const CASOS: Caso[] = [
     reserva: {
       hotel: "Grand Palladium Imbassaí Resort & Spa - All Inclusive",
       localizador: "4PPZGW",
-      hospedes: "Luiza Paixao, Isadora Sampaio, Barbara Couto",
+      hospedes: "Hóspede 1, Hóspede 2, Hóspede 3", // anonimizado; eram 3 hóspedes reais da reserva
       dataCheckin: "18/11/2026",
       dataCheckout: "22/11/2026",
       regimeAlimentar: "All Inclusive",
@@ -91,7 +91,7 @@ const CASOS: Caso[] = [
     reserva: {
       hotel: "NH Collection Amsterdam Barbizon Palace",
       localizador: "B6CZXS",
-      hospedes: "ELOI OLIVEIRA, ADRIANA OLIVEIRA",
+      hospedes: "Hóspede 1, Hóspede 2", // anonimizado; eram 2 hóspedes reais da reserva
       dataCheckin: "19/11/2026",
       dataCheckout: "20/11/2026",
       regimeAlimentar: "Café da Manhã incluído",

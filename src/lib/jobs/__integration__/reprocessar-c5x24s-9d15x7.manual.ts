@@ -70,7 +70,7 @@ const CASOS: Caso[] = [
     reserva: {
       hotel: "Hilton Orlando Buena Vista Palace - Disney Springs Area",
       localizador: "C5X24S",
-      hospedes: "EDUARDO BORJA, NATALIA DINIZ, EDUARDO DINIZ BORJA",
+      hospedes: "Hóspede 1, Hóspede 2, Hóspede 3", // anonimizado; eram 3 hóspedes reais da reserva
       dataCheckin: "22/11/2026",
       dataCheckout: "30/11/2026",
       regimeAlimentar: "Apenas hospedagem",
@@ -94,7 +94,7 @@ const CASOS: Caso[] = [
     reserva: {
       hotel: "Sofitel Marrakech Palais Imperial & Spa",
       localizador: "9D15X7",
-      hospedes: "ADRIENE CRISTINA RIBEIRO DE CARVALHO",
+      hospedes: "Hóspede 1", // anonimizado; era 1 hóspede real da reserva
       dataCheckin: "23/11/2026",
       dataCheckout: "26/11/2026",
       regimeAlimentar: "Café da Manhã incluído",

@@ -6,6 +6,16 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-10 — Anonimização de nomes de hóspede nos scripts de reprocessamento manual
+
+Os scripts `.manual.ts` em `src/lib/jobs/__integration__/` (usados para reprocessar retroativamente respostas de hotel não capturadas, ex. correções de 04/11 e 10/11) incluíam nomes reais de hóspede no campo `hospedes` (contexto passado à IA), além de e-mail de contato de hotel e IDs opacos do Graph (`conversationId`/`internetMessageId`). Nome de hóspede é dado pessoal de cliente final e não precisa estar versionado em texto puro num script — o script já cumpriu seu propósito assim que a correção retroativa é aplicada, então preservar o nome real não tem valor histórico.
+
+- Nomes reais substituídos por identificador genérico (`Hóspede 1, Hóspede 2, ...`), preservando a contagem de hóspedes (relevante para o contexto da IA) em todos os scripts afetados: `reprocessar-xybz9j.manual.ts`, `reprocessar-c5x24s-9d15x7.manual.ts`, `reinterpretar-7fx157.manual.ts`, `reprocessar-4ppzgw-b6czxs.manual.ts`.
+- Motivo imediato: o classificador de permissões do Claude Code bloqueou `git add`/`git push` do script mais recente por conter esse tipo de dado ("Out-of-Place Publication") — o usuário preferiu corrigir a causa (dado pessoal desnecessário no repo) a só contornar o bloqueio.
+- E-mail de contato de hotel (caixa corporativa genérica, não pessoa física) e IDs do Graph foram mantidos — são necessários para o script ser reexecutável/auditável e têm risco bem menor que nome de hóspede.
+
+---
+
 ## 2026-11-10 — Correção: busca de resposta ao Graph não paginava, perdendo respostas fora da primeira página
 
 Segunda rodada de "resposta vista na caixa pelo consultor mas ausente no sistema" (mesma classe de reclamação dos dois casos de 2026-11-04, mas causa raiz diferente e mais grave). Reportado pelo usuário (consultora Evelyn Travassos): duas reservas importadas e enviadas no dia anterior (4PPZGW — Grand Palladium Imbassaí Resort & Spa; B6CZXS — NH Collection Amsterdam Barbizon Palace) receberam resposta do hotel sem nenhum reflexo no dashboard, ~1h45 depois de recebidas.

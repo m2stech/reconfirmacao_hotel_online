@@ -58,7 +58,7 @@ const envio: EnvioParaBuscaDeResposta = {
 const reserva: DadosReservaParaIA = {
   hotel: "Universal's Endless Summer Resort - Dockside Inn and Suites",
   localizador: LOCALIZADOR,
-  hospedes: "IGOR DINIZ, SELMA DINIZ, MARIA DE FATIMA FRAIHA",
+  hospedes: "Hóspede 1, Hóspede 2, Hóspede 3", // anonimizado; eram 3 hóspedes reais da reserva
   dataCheckin: "22/11/2026",
   dataCheckout: "30/11/2026",
   regimeAlimentar: "Apenas hospedagem",

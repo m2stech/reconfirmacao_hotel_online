@@ -42,7 +42,7 @@ async function main() {
   const reserva: DadosReservaParaIA = {
     hotel: "MR Hotel",
     localizador: "7FX157",
-    hospedes: "Otorino Otaviano Neto, Lucimara Vidal",
+    hospedes: "Hóspede 1, Hóspede 2", // anonimizado; eram 2 hóspedes reais da reserva
     dataCheckin: "04/11/2026",
     dataCheckout: "08/11/2026",
     regimeAlimentar: "Café da manhã com buffet incluido",
