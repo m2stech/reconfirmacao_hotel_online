@@ -74,7 +74,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
 
     const supabaseServiceRole = createServiceRoleClient();
-    await supabaseServiceRole.from("audit_log").insert({
+    await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
       actor_id: user.id,
       action: "email_send_failed",
       entity_type: "email_send",
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
 
   const supabaseServiceRole = createServiceRoleClient();
-  await supabaseServiceRole.from("audit_log").insert({
+  await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: user.id,
     action: "email_send_succeeded",
     entity_type: "email_send",

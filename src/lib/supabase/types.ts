@@ -295,10 +295,69 @@ export type Database = {
           },
         ]
       }
+      quote_commercial_status_history: {
+        Row: {
+          changed_by: string
+          created_at: string
+          id: string
+          new_status: Database["public"]["Enums"]["commercial_status"]
+          previous_status:
+            | Database["public"]["Enums"]["commercial_status"]
+            | null
+          quote_id: string
+          reason: string | null
+          reference: string | null
+        }
+        Insert: {
+          changed_by: string
+          created_at?: string
+          id?: string
+          new_status: Database["public"]["Enums"]["commercial_status"]
+          previous_status?:
+            | Database["public"]["Enums"]["commercial_status"]
+            | null
+          quote_id: string
+          reason?: string | null
+          reference?: string | null
+        }
+        Update: {
+          changed_by?: string
+          created_at?: string
+          id?: string
+          new_status?: Database["public"]["Enums"]["commercial_status"]
+          previous_status?:
+            | Database["public"]["Enums"]["commercial_status"]
+            | null
+          quote_id?: string
+          reason?: string | null
+          reference?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_commercial_status_history_changed_by_fkey"
+            columns: ["changed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quote_commercial_status_history_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quotes: {
         Row: {
           agency: string
           ai_output: Json | null
+          commercial_reason: string | null
+          commercial_reference: string | null
+          commercial_status: Database["public"]["Enums"]["commercial_status"]
+          commercial_status_updated_at: string | null
+          commercial_status_updated_by: string | null
           consultant: string
           created_at: string
           created_by: string
@@ -316,6 +375,11 @@ export type Database = {
         Insert: {
           agency: string
           ai_output?: Json | null
+          commercial_reason?: string | null
+          commercial_reference?: string | null
+          commercial_status?: Database["public"]["Enums"]["commercial_status"]
+          commercial_status_updated_at?: string | null
+          commercial_status_updated_by?: string | null
           consultant?: string
           created_at?: string
           created_by: string
@@ -333,6 +397,11 @@ export type Database = {
         Update: {
           agency?: string
           ai_output?: Json | null
+          commercial_reason?: string | null
+          commercial_reference?: string | null
+          commercial_status?: Database["public"]["Enums"]["commercial_status"]
+          commercial_status_updated_at?: string | null
+          commercial_status_updated_by?: string | null
           consultant?: string
           created_at?: string
           created_by?: string
@@ -348,6 +417,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "quotes_commercial_status_updated_by_fkey"
+            columns: ["commercial_status_updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "quotes_created_by_fkey"
             columns: ["created_by"]
@@ -379,6 +455,7 @@ export type Database = {
         | "institutional_logo"
         | "cruise_itinerary_image"
         | "cruise_photo"
+      commercial_status: "pending" | "won" | "lost"
       product_type: "terrestre" | "cruzeiro"
       quote_status: "draft" | "processing" | "done" | "error"
       user_role: "consultant" | "admin"
@@ -389,6 +466,36 @@ export type Database = {
   }
   reconfirmacao: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          metadata: Json
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          metadata?: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          metadata?: Json
+        }
+        Relationships: []
+      }
       broker_sends: {
         Row: {
           assunto: string
@@ -896,6 +1003,7 @@ export type Database = {
       }
     }
     Functions: {
+      is_active_admin: { Args: never; Returns: boolean }
       is_active_authenticated_user: { Args: never; Returns: boolean }
     }
     Enums: {
@@ -1048,6 +1156,7 @@ export const Constants = {
         "cruise_itinerary_image",
         "cruise_photo",
       ],
+      commercial_status: ["pending", "won", "lost"],
       product_type: ["terrestre", "cruzeiro"],
       quote_status: ["draft", "processing", "done", "error"],
       user_role: ["consultant", "admin"],

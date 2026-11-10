@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
     const hotel = await criarHotel(supabase, { nome, pais, idioma, email });
 
     const supabaseServiceRole = createServiceRoleClient();
-    await supabaseServiceRole.from("audit_log").insert({
+    await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
       actor_id: user.id,
       action: "hotel_created",
       entity_type: "hotel",

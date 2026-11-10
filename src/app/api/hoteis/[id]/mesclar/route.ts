@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await mesclarHoteis(supabase, hotelPrincipalId, id);
 
     const supabaseServiceRole = createServiceRoleClient();
-    await supabaseServiceRole.from("audit_log").insert({
+    await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
       actor_id: user.id,
       action: "hotels_merged",
       entity_type: "hotel",

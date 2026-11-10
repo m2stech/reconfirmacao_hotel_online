@@ -32,7 +32,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const supabaseServiceRole = createServiceRoleClient();
-  const { error: erroAuditLog } = await supabaseServiceRole.from("audit_log").insert({
+  const { error: erroAuditLog } = await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: guard.user.id,
     action: active !== undefined ? (active ? "user_reactivated" : "user_deactivated") : "user_role_changed",
     entity_type: "profile",

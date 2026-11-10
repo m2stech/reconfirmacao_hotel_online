@@ -25,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const hotelEmail = await adicionarEmailHotel(supabase, id, email);
 
     const supabaseServiceRole = createServiceRoleClient();
-    await supabaseServiceRole.from("audit_log").insert({
+    await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
       actor_id: user.id,
       action: "hotel_email_added",
       entity_type: "hotel",

@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
   }
 
   const supabaseServiceRole = createServiceRoleClient();
-  const { error: erroAuditLog } = await supabaseServiceRole.from("audit_log").insert({
+  const { error: erroAuditLog } = await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: guard.user.id,
     action: "user_invited",
     entity_type: "profile",

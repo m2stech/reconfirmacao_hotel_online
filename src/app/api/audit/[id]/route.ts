@@ -122,7 +122,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // audit_log não tem policy de INSERT para o client (CLAUDE.md "Banco de
   // dados"): todo insert é feito com a service role no backend.
   const supabaseServiceRole = createServiceRoleClient();
-  await supabaseServiceRole.from("audit_log").insert({
+  await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: user.id,
     action: "audit_status_updated",
     entity_type: "reservation",

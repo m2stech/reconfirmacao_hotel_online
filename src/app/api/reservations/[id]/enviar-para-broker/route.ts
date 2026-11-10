@@ -99,7 +99,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   const supabaseServiceRole = createServiceRoleClient();
-  await supabaseServiceRole.from("audit_log").insert({
+  await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: user.id,
     action: resultadoEnvio.sucesso ? "broker_send_succeeded" : "broker_send_failed",
     entity_type: "broker_send",

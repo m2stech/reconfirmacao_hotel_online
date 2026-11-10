@@ -155,7 +155,7 @@ async function main() {
 
       console.log("\nLinha gravada em hotel_replies:", JSON.stringify(persistido, null, 2));
 
-      await supabase.from("audit_log").insert({
+      await supabase.schema("reconfirmacao").from("audit_log").insert({
         actor_id: actorId,
         action: "correcao_captura_resposta_nao_registrada",
         entity_type: "hotel_reply",

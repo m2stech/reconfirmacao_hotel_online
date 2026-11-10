@@ -91,7 +91,7 @@ async function main() {
   const actorId = process.env.CRON_SYSTEM_USER_ID;
   if (!actorId) throw new Error("CRON_SYSTEM_USER_ID não configurado — necessário para audit_log.actor_id (NOT NULL).");
 
-  await supabase.from("audit_log").insert({
+  await supabase.schema("reconfirmacao").from("audit_log").insert({
     actor_id: actorId,
     action: "correcao_interpretacao_ia",
     entity_type: "hotel_reply",

@@ -63,7 +63,7 @@ async function executarEnvioEregistrar(
   });
 
   const supabaseServiceRole = createServiceRoleClient();
-  await supabaseServiceRole.from("audit_log").insert({
+  await supabaseServiceRole.schema("reconfirmacao").from("audit_log").insert({
     actor_id: userId,
     action: resultadoEnvio.sucesso ? "email_send_succeeded" : "email_send_failed",
     entity_type: "email_send",
