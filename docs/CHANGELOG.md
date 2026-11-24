@@ -6,6 +6,22 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-24 — Correção: hotel no Brasil recebia e-mail em inglês por país errado vindo do Tavily
+
+Usuário reportou reclamação de consultor: "o dashboard segue enviando email em inglês para hotéis no Brasil". Reproduzido com o caso indicado pelo usuário (hotel já confirmado "Intercity Sao Paulo Ibirapuera", cadastrado com `pais = "Porto Alegre"`).
+
+**Causa raiz 1** em `extrairPais` (`src/lib/tavily/client.ts`): a resposta real da Tavily para esse hotel descreve cidade e país na mesma frase — *"the hotel is located in São Paulo, Brazil, with the address ... 04008-011 SAO PAULO, Brazil"*. `PADRAO_GENERICO` (`(?:located in|in)\s+([A-Z][a-z]+...)`) para na primeira palavra capitalizada após "in"/"located in", que é sempre a cidade, nunca alcançando o país que vem depois da vírgula na mesma frase — exatamente o padrão que causou "Porto Alegre" (um resultado de baixo score mencionava a sede da rede Intercity Hotels em Porto Alegre) e abriria espaço para qualquer outra cidade ser capturada em vez do país.
+
+**Causa raiz 2** (composta, em `idiomaPorPais`, `src/lib/graph/email-template.ts`): mesmo nos casos em que a extração de país acertasse e devolvesse "Brazil" (grafia em inglês — a busca ao Tavily é sempre feita em inglês), o idioma ainda sairia errado, porque `PAISES_PORTUGUES`/`PAISES_ESPANHOL` só reconheciam grafia em português/espanhol ("brasil", "espanha", "mexico", ...), nunca a equivalente em inglês.
+
+- `extrairPais`: após o match de `PADRAO_GENERICO` (cidade), busca agora uma vírgula imediatamente seguinte com outro nome capitalizado (`PADRAO_CIDADE_VIRGULA_PAIS`) — esse é o país e passa a prevalecer sobre a cidade capturada antes dele. Sem essa vírgula (frase não segue o padrão "City, Country"), mantém o comportamento anterior.
+- `idiomaPorPais`: `PAISES_PORTUGUES`/`PAISES_ESPANHOL` passam a incluir também a grafia em inglês de cada país ("brazil", "spain", "dominican republic", ...), já que o país vindo do Tavily pode chegar nessa forma.
+- Novos testes de regressão: `src/lib/tavily/client.test.ts` reproduz a resposta real da Tavily para o caso do Intercity (espera `pais === "Brazil"`); `src/lib/graph/email-template.test.ts` cobre `idiomaPorPais` com país em inglês ("Brazil" → pt, "Spain"/"Mexico" → es).
+- Validado com chamada real à Tavily (PRD §7.2) para o nome exato do hotel reportado — resposta observada confirma a causa raiz e o fixture de teste reproduz essa resposta literalmente, não um caso sintético aproximado.
+- Hotéis já cadastrados com país errado (ex. "Porto Alegre" no Intercity) não são corrigidos retroativamente por esta mudança — ela só afeta hotéis novos/reenriquecidos a partir de agora. Correção de cadastro existente é manual, via "Corrigir e-mail e país do hotel" no dialog da reserva (fluxo já existente desde 2026-10-29).
+
+---
+
 ## 2026-11-10 — Anonimização de nomes de hóspede nos scripts de reprocessamento manual
 
 Os scripts `.manual.ts` em `src/lib/jobs/__integration__/` (usados para reprocessar retroativamente respostas de hotel não capturadas, ex. correções de 04/11 e 10/11) incluíam nomes reais de hóspede no campo `hospedes` (contexto passado à IA), além de e-mail de contato de hotel e IDs opacos do Graph (`conversationId`/`internetMessageId`). Nome de hóspede é dado pessoal de cliente final e não precisa estar versionado em texto puro num script — o script já cumpriu seu propósito assim que a correção retroativa é aplicada, então preservar o nome real não tem valor histórico.

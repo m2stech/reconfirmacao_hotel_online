@@ -9,10 +9,16 @@
 
 export type Idioma = "pt" | "es" | "en";
 
-const PAISES_PORTUGUES = new Set(["brasil", "portugal"]);
+// País pode vir tanto em PT/ES (cadastro manual) quanto em EN (resposta do
+// Tavily, cuja busca é sempre feita em inglês — ver lib/tavily/client.ts) —
+// daí incluir aqui também a grafia em inglês de cada país PT/ES, para que
+// "Brazil"/"Spain"/"Mexico" etc. resolvam para o mesmo idioma que
+// "Brasil"/"Espanha"/"México".
+const PAISES_PORTUGUES = new Set(["brasil", "brazil", "portugal"]);
 const PAISES_ESPANHOL = new Set([
   "espana",
   "espanha",
+  "spain",
   "argentina",
   "chile",
   "mexico",
@@ -30,6 +36,7 @@ const PAISES_ESPANHOL = new Set([
   "el salvador",
   "nicaragua",
   "republica dominicana",
+  "dominican republic",
 ]);
 
 function normalizarSemAcentos(valor: string): string {

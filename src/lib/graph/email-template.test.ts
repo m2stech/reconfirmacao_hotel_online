@@ -25,6 +25,12 @@ describe("idiomaPorPais", () => {
     expect(idiomaPorPais("México")).toBe("es");
   });
 
+  it("retorna pt/es também quando o país vem em inglês (resposta do Tavily, cuja busca é sempre em inglês)", () => {
+    expect(idiomaPorPais("Brazil")).toBe("pt");
+    expect(idiomaPorPais("Spain")).toBe("es");
+    expect(idiomaPorPais("Mexico")).toBe("es");
+  });
+
   it("retorna en como default para país desconhecido ou vazio", () => {
     expect(idiomaPorPais("Alemanha")).toBe("en");
     expect(idiomaPorPais(null)).toBe("en");

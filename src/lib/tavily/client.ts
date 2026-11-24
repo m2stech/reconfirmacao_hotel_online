@@ -138,10 +138,28 @@ export async function buscarContatoHotel(nomeHotel: string): Promise<ResultadoBu
 const PADRAO_EXPLICITO = /[Cc]ountry\s+(?:of|is|:)\s+([A-ZÀ-Ý][a-zà-ÿ]+(?:\s[A-ZÀ-Ý][a-zà-ÿ]+)?)/;
 const PADRAO_GENERICO = /(?:located in|in)\s+([A-ZÀ-Ý][a-zà-ÿ]+(?:\s[A-ZÀ-Ý][a-zà-ÿ]+)?)/;
 
+// Caso real observado (Intercity Sao Paulo Ibirapuera, 2026-11-24): a
+// resposta da Tavily descreve cidade e país na mesma frase, separados por
+// vírgula — "located in São Paulo, Brazil" ou "04008-011 SAO PAULO, Brazil".
+// PADRAO_GENERICO sozinho para na primeira palavra capitalizada após
+// "in"/"located in" (a cidade) e nunca alcança o país que vem depois da
+// vírgula. Aqui, a partir de onde PADRAO_GENERICO casou, procura-se uma
+// vírgula seguida de outro nome capitalizado — esse é o país, e deve
+// prevalecer sobre a cidade capturada antes dele. A vírgula precisa vir logo
+// em seguida (só espaço entre o fim do match genérico e a vírgula) para não
+// pegar uma vírgula de outra frase mais adiante no texto.
+const PADRAO_CIDADE_VIRGULA_PAIS = /^\s*,\s*([A-ZÀ-Ý][a-zà-ÿ]+(?:\s[A-ZÀ-Ý][a-zà-ÿ]+)?)/;
+
 function extrairPais(respostaTavily: string): string | null {
   const matchExplicito = respostaTavily.match(PADRAO_EXPLICITO);
   if (matchExplicito) return matchExplicito[1];
 
   const matchGenerico = respostaTavily.match(PADRAO_GENERICO);
-  return matchGenerico ? matchGenerico[1] : null;
+  if (!matchGenerico) return null;
+
+  const restoAposMatch = respostaTavily.slice((matchGenerico.index ?? 0) + matchGenerico[0].length);
+  const matchCidadeVirgulaPais = restoAposMatch.match(PADRAO_CIDADE_VIRGULA_PAIS);
+  if (matchCidadeVirgulaPais) return matchCidadeVirgulaPais[1];
+
+  return matchGenerico[1];
 }

@@ -59,6 +59,25 @@ describe("buscarContatoHotel (Tavily, nunca chamada real em teste de unidade —
     expect(resultado.pais).toBe("Portugal");
   });
 
+  it("extrai o país, não a cidade, quando a resposta descreve 'City, Country' na mesma frase (caso real: Intercity Sao Paulo Ibirapuera)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          answer:
+            "The reservations email address is not provided directly in the sources. The hotel is located in São Paulo, Brazil, with the address Rua Joinville 515, Vila Mariana, 04008-011 SAO PAULO, Brazil.",
+          results: [],
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { buscarContatoHotel } = await import("./client");
+    const resultado = await buscarContatoHotel("Intercity Sao Paulo Ibirapuera");
+
+    expect(resultado.pais).toBe("Brazil");
+  });
+
   it("ignora e-mails de domínios de OTA/agregador, não os trata como contato do hotel", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
