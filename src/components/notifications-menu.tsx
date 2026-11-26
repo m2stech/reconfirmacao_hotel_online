@@ -53,6 +53,7 @@ export function NotificationsMenu() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- busca assíncrona de dados ao montar/no polling; setState ocorre dentro do fetch, não sincronamente no corpo do efeito.
     carregar();
     const intervalo = setInterval(carregar, INTERVALO_POLLING_MS);
     return () => clearInterval(intervalo);

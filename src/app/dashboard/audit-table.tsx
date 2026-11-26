@@ -81,10 +81,12 @@ export function AuditTable() {
 
   useEffect(() => {
     const statusUrl = searchParams.get("status") ?? "todos";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sincroniza o filtro local com a URL (busca por link/voltar), não deriva estado de outro estado.
     setFiltroStatus(statusUrl);
   }, [searchParams]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- busca assíncrona de dados ao montar/mudar filtro; setState ocorre dentro do fetch, não sincronamente no corpo do efeito.
     carregarPagina(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroStatus, filtroHotel, filtroLocalizador]);

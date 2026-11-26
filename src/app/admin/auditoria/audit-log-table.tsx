@@ -93,6 +93,7 @@ export function AuditLogTable() {
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- busca assíncrona de dados ao montar/mudar filtro; setState ocorre dentro do fetch, não sincronamente no corpo do efeito.
     carregarPagina(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroEntityType, filtroActorId, filtroDataInicio, filtroDataFim]);
