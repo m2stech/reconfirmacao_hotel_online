@@ -14,6 +14,7 @@ export const STATUS_AUDITORIA = [
   "NAO_CONFIRMADA",
   "NAO_ENVIADO",
   "EMAIL_NAO_ENCONTRADO",
+  "RESERVA_CANCELADA",
 ] as const;
 
 export type StatusAuditoria = (typeof STATUS_AUDITORIA)[number];
@@ -28,6 +29,7 @@ export const STATUS_LABEL: Record<StatusAuditoria, string> = {
   NAO_CONFIRMADA: "Não confirmada",
   NAO_ENVIADO: "Não enviado",
   EMAIL_NAO_ENCONTRADO: "E-mail não encontrado",
+  RESERVA_CANCELADA: "Reserva cancelada",
 };
 
 export const STATUS_BADGE_VARIANT: Record<
@@ -43,6 +45,7 @@ export const STATUS_BADGE_VARIANT: Record<
   NAO_CONFIRMADA: "destructive",
   NAO_ENVIADO: "outline",
   EMAIL_NAO_ENCONTRADO: "destructive",
+  RESERVA_CANCELADA: "secondary",
 };
 
 // Subconjunto dos status que o consultor pode definir manualmente — exclui
@@ -72,4 +75,5 @@ export const METRICA_CARDS: { status: StatusAuditoria | "TOTAL"; label: string }
   { status: "RESPONDIDO_AO_HOTEL", label: "Respondido ao hotel" },
   { status: "ERRO_NO_ENVIO", label: "Erro no envio" },
   { status: "EMAIL_NAO_ENCONTRADO", label: "E-mail não encontrado" },
+  { status: "RESERVA_CANCELADA", label: "Reservas canceladas" },
 ];

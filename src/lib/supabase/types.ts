@@ -1030,6 +1030,7 @@ export type Database = {
         | "ERRO_NO_ENVIO"
         | "NAO_CONFIRMADA"
         | "EMAIL_NAO_ENCONTRADO"
+        | "RESERVA_CANCELADA"
       contact_reliability: "confirmado" | "sugerido" | "obsoleto"
       contact_source: "manual" | "tavily"
       email_send_kind: "reconfirmacao_inicial" | "reenvio" | "resposta_manual"
@@ -1187,6 +1188,7 @@ export const Constants = {
         "ERRO_NO_ENVIO",
         "NAO_CONFIRMADA",
         "EMAIL_NAO_ENCONTRADO",
+        "RESERVA_CANCELADA",
       ],
       contact_reliability: ["confirmado", "sugerido", "obsoleto"],
       contact_source: ["manual", "tavily"],

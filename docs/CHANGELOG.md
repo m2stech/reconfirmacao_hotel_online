@@ -6,6 +6,17 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-26 — Novo status manual "Reserva cancelada" no dashboard de auditoria
+
+Pedido do usuário: marcar reservas canceladas pelo cliente com um status próprio, em vez de forçar o consultor a usar "Revisar" ou deixar o status automático desatualizado.
+
+- Novo valor `RESERVA_CANCELADA` no enum `reconfirmacao.audit_status_manual` (migration `20261126130822`, revisada pelo `supabase-rls-reviewer` sem achados — só adiciona valor a enum já existente, nenhuma policy nova necessária).
+- Mesmo padrão dos demais status de `STATUS_MANUAL_OPCOES` (`src/features/audit/status.ts`): só existe como override manual em `reservations.status_manual`, nunca calculado automaticamente — o sistema não tem como inferir cancelamento sozinho.
+- Aparece automaticamente no filtro de status do dashboard (`audit-table.tsx`), no select de edição manual (`reservation-detail-dialog.tsx`) e no export (`/api/audit/export`), porque todos já iteram sobre `STATUS_AUDITORIA`/`STATUS_MANUAL_OPCOES` em vez de lista hardcoded. Também ganhou card de contagem em `METRICA_CARDS`.
+- Decisão de produto (perguntado ao usuário): reserva cancelada deixa de ser elegível para cobrança automática (reenvio de 24h) e para a verificação periódica de resposta do hotel — sem precisar alterar `collection-pending.ts`/`pending.ts`, já que os dois jobs filtram por `audit_status.status = 'AGUARDANDO_RESPOSTA'` e o override manual sobrepõe o cálculo automático na view.
+
+---
+
 ## 2026-11-24 — Correção: hotel no Brasil recebia e-mail em inglês por país errado vindo do Tavily
 
 Usuário reportou reclamação de consultor: "o dashboard segue enviando email em inglês para hotéis no Brasil". Reproduzido com o caso indicado pelo usuário (hotel já confirmado "Intercity Sao Paulo Ibirapuera", cadastrado com `pais = "Porto Alegre"`).
