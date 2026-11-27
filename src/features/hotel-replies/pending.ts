@@ -8,7 +8,14 @@ type TypedClient = SupabaseClient<Database>;
 export type ReservaPendenteDeResposta = {
   emailSendId: string;
   reservationId: string;
-  envio: EnvioParaBuscaDeResposta;
+  /**
+   * Todas as conversas onde uma resposta pode chegar para esta reserva: o
+   * envio ao hotel sempre está presente; o último envio ao broker (se
+   * existir, via "Enviar para Broker") entra como candidato adicional — caso
+   * real YDKM7W/JM1XJW (2026-11-26): a Hotelbeds reconfirmou a reserva por
+   * e-mail, mas só em resposta à thread do broker, nunca na do hotel.
+   */
+  envios: EnvioParaBuscaDeResposta[];
   dadosParaIA: DadosReservaParaIA;
   createdByEnvioOriginal: string | null;
 };
@@ -65,6 +72,25 @@ export async function listarReservasAguardandoResposta(
   const reservasPorId = new Map((reservas ?? []).map((r) => [r.id, r]));
   const hoteisPorId = new Map((hoteis ?? []).map((h) => [h.id, h]));
 
+  // Último envio ao broker de cada reserva (se houver) — "Enviar para
+  // Broker" é uma ação manual e repetível do consultor (ver
+  // `enviar-para-broker/route.ts`), então pode haver mais de um por reserva;
+  // só o mais recente importa para localizar a resposta mais atual.
+  const { data: enviosBroker, error: erroEnviosBroker } = await supabase
+    .schema("reconfirmacao")
+    .from("broker_sends")
+    .select("reservation_id, destinatario, assunto, graph_conversation_id, internet_message_id, graph_message_id, created_at")
+    .in("reservation_id", reservationIds)
+    .order("created_at", { ascending: false });
+  if (erroEnviosBroker) throw erroEnviosBroker;
+
+  const ultimoEnvioBrokerPorReserva = new Map<string, NonNullable<typeof enviosBroker>[number]>();
+  for (const envioBroker of enviosBroker ?? []) {
+    if (!ultimoEnvioBrokerPorReserva.has(envioBroker.reservation_id)) {
+      ultimoEnvioBrokerPorReserva.set(envioBroker.reservation_id, envioBroker);
+    }
+  }
+
   const resultado: ReservaPendenteDeResposta[] = [];
   for (const envio of envios ?? []) {
     const reserva = reservasPorId.get(envio.reservation_id);
@@ -72,11 +98,8 @@ export async function listarReservasAguardandoResposta(
     const hotel = reserva.hotel_id ? hoteisPorId.get(reserva.hotel_id) : undefined;
     const hospedesArray = Array.isArray(reserva.hospedes) ? (reserva.hospedes as { nome?: string }[]) : [];
 
-    resultado.push({
-      emailSendId: envio.id,
-      reservationId: reserva.id,
-      createdByEnvioOriginal: envio.created_by,
-      envio: {
+    const envios_: EnvioParaBuscaDeResposta[] = [
+      {
         destinatario: envio.destinatario,
         conversationId: envio.graph_conversation_id,
         internetMessageId: envio.internet_message_id,
@@ -85,6 +108,26 @@ export async function listarReservasAguardandoResposta(
         localizador: reserva.localizador,
         dataEnvio: envio.created_at,
       },
+    ];
+
+    const envioBroker = ultimoEnvioBrokerPorReserva.get(reserva.id);
+    if (envioBroker) {
+      envios_.push({
+        destinatario: envioBroker.destinatario,
+        conversationId: envioBroker.graph_conversation_id,
+        internetMessageId: envioBroker.internet_message_id,
+        graphMessageId: envioBroker.graph_message_id,
+        assunto: envioBroker.assunto,
+        localizador: reserva.localizador,
+        dataEnvio: envioBroker.created_at,
+      });
+    }
+
+    resultado.push({
+      emailSendId: envio.id,
+      reservationId: reserva.id,
+      createdByEnvioOriginal: envio.created_by,
+      envios: envios_,
       dadosParaIA: {
         hotel: hotel?.nome ?? "",
         localizador: reserva.localizador,

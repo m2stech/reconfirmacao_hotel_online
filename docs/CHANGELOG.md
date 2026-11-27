@@ -6,6 +6,24 @@ Formato de cada entrada: data, título curto, o que mudou e por quê (não só o
 
 ---
 
+## 2026-11-27 — Correção: resposta do Broker não era capturada pelo job de leitura automática
+
+Usuário reportou (reservas YDKM7W — Vila Galé Salvador — e JM1XJW — HF Fenix Garden): usou "Enviar para Broker" pela primeira vez em produção (2026-11-26) e a Hotelbeds reconfirmou as duas reservas por e-mail, mas o dashboard nunca refletiu isso — só visível pelo Outlook.
+
+**Causa raiz (duas, compostas):**
+
+1. **Estrutural** (a mais grave): `listarReservasAguardandoResposta`/`processarLoteDeRespostas` (`src/features/hotel-replies/pending.ts`, `process-batch.ts`) só buscavam resposta na conversa do e-mail enviado ao **hotel** (`email_sends`). `broker_sends` é, por design original (ver migration `20261103130814_reconfirmacao_brokers.sql`), isolado do fluxo automático — decisão correta para cobrança/dedup, mas que também excluía o broker da **leitura** de resposta, sem essa distinção ter sido feita explicitamente até agora.
+2. **Threading quebrado pelo helpdesk da Hotelbeds** (mesma classe dos casos de 2026-11-04/11-10, causa nova): confirmado via Graph API que a resposta definitiva da Hotelbeds (sistema de ticket Salesforce, domínio `sfdc.net`) chega com `conversationId` **novo a cada troca** (o próprio ack automático de abertura de ticket já tem um `conversationId` diferente do envio original, e a resposta final tem um terceiro `conversationId`), sem `In-Reply-To`/`References`. A única correlação possível é o assunto, prefixado com `#<número do ticket> ` a cada resposta (ex. `#62812466 RE: Confirmação de reserva - Vila Galé Salvador...`).
+
+- `pending.ts`: `ReservaPendenteDeResposta.envio` (singular) virou `envios` (array) — sempre inclui o envio ao hotel e, quando existir, o **último** envio registrado em `broker_sends` da mesma reserva, como conversa candidata adicional para a busca de resposta.
+- `process-batch.ts`: `processarLoteDeRespostas` busca mensagens em todas as conversas candidatas da reserva e deduplica por `internetMessageId` antes de interpretar — a resposta localizada por qualquer uma das buscas continua sendo persistida contra o `email_send_id` original (schema de `hotel_replies` não mudou).
+- `read-mail.ts`: `mensagemCorresponde` agora remove um prefixo `#<dígitos> ` do assunto da mensagem recebida antes de comparar — sem isso, o fallback por assunto nunca batia contra o assunto original.
+- Novo teste de regressão em `process-batch.test.ts` reproduzindo o caso (resposta só aparece na busca pela conversa do broker, não na do hotel). `read-mail.test.ts` já cobria fallback por assunto/in-reply-to — adaptado para incluir o prefixo de ticket.
+- **Correção retroativa:** as duas respostas da Hotelbeds (confirmando as reservas, localizadas via Graph API com o fix já validado) foram reprocessadas pelo fluxo normal de produção, registradas em `audit_log`.
+- Nenhuma mudança de schema/RLS: `broker_sends` já tinha `grant select` para `service_role` desde a migration original — só uma leitura nova a partir do job, que já roda com esse client.
+
+---
+
 ## 2026-11-26 — Novo status manual "Reserva cancelada" no dashboard de auditoria
 
 Pedido do usuário: marcar reservas canceladas pelo cliente com um status próprio, em vez de forçar o consultor a usar "Revisar" ou deixar o status automático desatualizado.

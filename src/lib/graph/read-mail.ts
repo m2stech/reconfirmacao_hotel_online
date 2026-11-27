@@ -94,7 +94,12 @@ function mensagemCorresponde(mensagem: MensagemGraph, envio: EnvioParaBuscaDeRes
     return true;
   }
 
-  const assuntoMensagem = (mensagem.subject ?? "").toLowerCase();
+  // Alguns sistemas de ticket (ex. Hotelbeds/Salesforce, caso real YDKM7W e
+  // JM1XJW, 2026-11-26) prefixam o assunto com "#<número do ticket> " a cada
+  // resposta, sem preservar conversationId nem In-Reply-To/References — a
+  // única correlação possível nesses casos é o assunto original, que o
+  // prefixo não remove, só antecede.
+  const assuntoMensagem = (mensagem.subject ?? "").toLowerCase().replace(/^#\d+\s*/, "");
   const assuntoEnvio = envio.assunto.toLowerCase();
   const localizador = envio.localizador.toLowerCase();
   return assuntoMensagem.includes(localizador) || assuntoMensagem.includes(assuntoEnvio);

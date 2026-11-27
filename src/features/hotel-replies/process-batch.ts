@@ -84,7 +84,21 @@ export async function processarLoteDeRespostas(
     resumo.reservasVerificadas += 1;
 
     try {
-      const mensagens = await buscarMensagensDaConversa(pendente.envio, internetIdsConhecidos);
+      // Busca em todas as conversas candidatas da reserva (hotel + broker,
+      // se houver) — a resposta definitiva pode chegar em qualquer uma
+      // delas. Deduplica por internetMessageId: a mesma mensagem pode ser
+      // encontrada mais de uma vez se mais de uma busca a corresponder.
+      const mensagensPorId = new Map<string, Awaited<ReturnType<typeof buscarMensagensDaConversa>>[number]>();
+      for (const envio of pendente.envios) {
+        const encontradas = await buscarMensagensDaConversa(envio, internetIdsConhecidos);
+        for (const mensagem of encontradas) {
+          const chave = mensagem.internetMessageId ?? mensagem.id;
+          if (!mensagensPorId.has(chave)) mensagensPorId.set(chave, mensagem);
+        }
+      }
+      const mensagens = [...mensagensPorId.values()].sort((a, b) =>
+        (a.receivedDateTime ?? "").localeCompare(b.receivedDateTime ?? "")
+      );
       resumo.mensagensEncontradas += mensagens.length;
 
       for (const mensagem of mensagens) {
@@ -123,9 +137,9 @@ export async function processarLoteDeRespostas(
           await notificar(supabase, {
             reservationId: pendente.reservationId,
             tipo: "revisao_humana",
-            mensagem: `Reserva ${pendente.envio.localizador}: resposta do hotel precisa de revisão humana.`,
-            assuntoEmail: `[Reconfirmação] Revisão humana pendente — ${pendente.envio.localizador}`,
-            corpoEmail: `<p>Uma resposta do hotel para a reserva <strong>${pendente.envio.localizador}</strong> foi interpretada, mas precisa de revisão humana antes de ser considerada confirmada.</p>`,
+            mensagem: `Reserva ${pendente.envios[0].localizador}: resposta do hotel precisa de revisão humana.`,
+            assuntoEmail: `[Reconfirmação] Revisão humana pendente — ${pendente.envios[0].localizador}`,
+            corpoEmail: `<p>Uma resposta do hotel para a reserva <strong>${pendente.envios[0].localizador}</strong> foi interpretada, mas precisa de revisão humana antes de ser considerada confirmada.</p>`,
             createdByEnvioOriginal: pendente.createdByEnvioOriginal,
           });
         }

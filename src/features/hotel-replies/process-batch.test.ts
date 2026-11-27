@@ -7,15 +7,17 @@ function pendenteBase(overrides: Partial<ReservaPendenteDeResposta> = {}): Reser
     emailSendId: "send-1",
     reservationId: "reserva-1",
     createdByEnvioOriginal: null,
-    envio: {
-      destinatario: "reservas@hotel.test",
-      conversationId: "conv-1",
-      internetMessageId: "<envio@snow.test>",
-      graphMessageId: "graph-envio",
-      assunto: "Confirmação de reserva",
-      localizador: "9QGJZN",
-      dataEnvio: "2026-10-01T10:00:00Z",
-    },
+    envios: [
+      {
+        destinatario: "reservas@hotel.test",
+        conversationId: "conv-1",
+        internetMessageId: "<envio@snow.test>",
+        graphMessageId: "graph-envio",
+        assunto: "Confirmação de reserva",
+        localizador: "9QGJZN",
+        dataEnvio: "2026-10-01T10:00:00Z",
+      },
+    ],
     dadosParaIA: {
       hotel: "Hotel Fictício",
       localizador: "9QGJZN",
@@ -64,8 +66,8 @@ async function montarAmbiente(options: {
   }));
 
   vi.doMock("@/lib/graph/read-mail", () => ({
-    buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envio"]) => {
-      const reserva = options.pendentes.find((p) => p.envio === envio);
+    buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envios"][number]) => {
+      const reserva = options.pendentes.find((p) => p.envios.includes(envio));
       return Promise.resolve(reserva ? options.mensagensPorReserva[reserva.reservationId] ?? [] : []);
     }),
   }));
@@ -114,9 +116,9 @@ describe("processarLoteDeRespostas", () => {
       listarInternetMessageIdsConhecidos: vi.fn().mockResolvedValue(new Set()),
     }));
     vi.doMock("@/lib/graph/read-mail", () => ({
-      buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envio"]) => {
-        if (envio === pendente1.envio) return Promise.resolve([mensagemTextoLivre("msg-1")]);
-        if (envio === pendente2.envio) return Promise.resolve([mensagemTextoLivre("msg-2")]);
+      buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envios"][number]) => {
+        if (pendente1.envios.includes(envio)) return Promise.resolve([mensagemTextoLivre("msg-1")]);
+        if (pendente2.envios.includes(envio)) return Promise.resolve([mensagemTextoLivre("msg-2")]);
         return Promise.resolve([]);
       }),
     }));
@@ -171,9 +173,9 @@ describe("processarLoteDeRespostas", () => {
       listarInternetMessageIdsConhecidos: vi.fn().mockResolvedValue(new Set()),
     }));
     vi.doMock("@/lib/graph/read-mail", () => ({
-      buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envio"]) => {
-        if (envio === pendente1.envio) return Promise.reject(new Error("Graph HTTP 500"));
-        if (envio === pendente2.envio) return Promise.resolve([mensagemBase()]);
+      buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envios"][number]) => {
+        if (pendente1.envios.includes(envio)) return Promise.reject(new Error("Graph HTTP 500"));
+        if (pendente2.envios.includes(envio)) return Promise.resolve([mensagemBase()]);
         return Promise.resolve([]);
       }),
     }));
@@ -189,5 +191,58 @@ describe("processarLoteDeRespostas", () => {
     expect(resumo.erros).toHaveLength(1);
     expect(resumo.erros[0].reservationId).toBe("reserva-1");
     expect(resumo.respostasProcessadas).toBe(1);
+  });
+
+  it("encontra a resposta que só chega na conversa do broker, não na do hotel (caso real YDKM7W/JM1XJW, 2026-11-26: Hotelbeds reconfirmou a reserva respondendo ao e-mail enviado via \"Enviar para Broker\", nunca na thread original com o hotel)", async () => {
+    const pendente = pendenteBase({
+      envios: [
+        {
+          destinatario: "reservas@hotel.test",
+          conversationId: "conv-hotel",
+          internetMessageId: "<envio-hotel@snow.test>",
+          graphMessageId: "graph-envio-hotel",
+          assunto: "Confirmação de reserva",
+          localizador: "9QGJZN",
+          dataEnvio: "2026-10-01T10:00:00Z",
+        },
+        {
+          destinatario: "broker@hotelbeds.test",
+          conversationId: "conv-broker",
+          internetMessageId: "<envio-broker@snow.test>",
+          graphMessageId: "graph-envio-broker",
+          assunto: "Confirmação de reserva",
+          localizador: "9QGJZN",
+          dataEnvio: "2026-10-03T10:00:00Z",
+        },
+      ],
+    });
+
+    vi.resetModules();
+    vi.doMock("./pending", () => ({
+      listarReservasAguardandoResposta: vi.fn().mockResolvedValue([pendente]),
+    }));
+    vi.doMock("./queries", () => ({
+      listarInternetMessageIdsConhecidos: vi.fn().mockResolvedValue(new Set()),
+    }));
+    vi.doMock("@/lib/graph/read-mail", () => ({
+      buscarMensagensDaConversa: vi.fn((envio: ReservaPendenteDeResposta["envios"][number]) => {
+        if (envio.destinatario === "reservas@hotel.test") return Promise.resolve([]);
+        if (envio.destinatario === "broker@hotelbeds.test") return Promise.resolve([mensagemBase()]);
+        return Promise.resolve([]);
+      }),
+    }));
+    const persistirMock = vi.fn().mockResolvedValue({ id: "reply-1" });
+    vi.doMock("./persist", () => ({ persistirInterpretacao: persistirMock }));
+    vi.doMock("@/features/notifications/notify", () => ({ notificar: vi.fn().mockResolvedValue(undefined) }));
+
+    const { processarLoteDeRespostas } = await import("./process-batch");
+    const supabaseFake = {} as never;
+
+    const resumo = await processarLoteDeRespostas(supabaseFake, { limiteReservas: 10, limiteChamadasIA: 5 });
+
+    expect(resumo.mensagensEncontradas).toBe(1);
+    expect(resumo.respostasProcessadas).toBe(1);
+    expect(persistirMock).toHaveBeenCalledTimes(1);
+    expect(persistirMock.mock.calls[0][1]).toBe("send-1");
   });
 });
